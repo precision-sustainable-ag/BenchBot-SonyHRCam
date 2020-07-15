@@ -1,4 +1,4 @@
-# Phenotyping-prototype
+# Phenotyping-prototype (Repository under construction)
 Greenhouses phenotyping prototype - Machine vision systems for monitoring phenotyping variables in greenhouses.
 
 Within the framework of the new technology development for phenotyping, we have developed an innovative prototype for the quick and efficient checking of plants in greenhouse environments. This system is cost-effective, upgradeable and modular. This first version of the system, has a mobile frame that can be moved on the greenhouse benches and at the same time it has a checking camera system per plant, which positions a color-depth camera on the plant to be checked.  Both systems require a laptop and a control code to be operated.
