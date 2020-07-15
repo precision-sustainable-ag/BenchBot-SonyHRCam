@@ -6,10 +6,13 @@ Within the framework of the new technology development for phenotyping, we have 
 In this first instance we are developing the movement control of a step motor, which moves the camera on a rail and in turn we are controlling the acquisition of both color and depth images. The milestone of development for this first phase is to have a moderately autonomous system that requires minimal human intervention. As an expected product of this system, we expect to have a stable control application and a correct database to perform the biomass measurement and plant detection algorithms.
 
 ![intro](greenhouse_design.png)
+
 Figure 1. Prototype design.
 
 ![intro2](assembly.png)
+
 Figure 2. System mounted with camera, lighting and close-up system to the pots.
 
 ![intro3](data.png)
-Color and Depth information.
+
+Figure 3. Color and Depth information.
