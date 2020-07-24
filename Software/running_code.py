@@ -34,6 +34,12 @@ ax_direction = DIRECTION.POSITIVE
 mm.configAxisDirection(axis, ax_direction)
 print("Axis direction set to " + str(ax_direction))
 
+#New variable declaration
+# Declare pointcloud object, for calculating pointclouds and texture mappings
+pc = rs.pointcloud()
+# We want the points object to be persistent so we can display the last cloud when a frame drops
+points = rs.points()
+
 ### real sense initialization ####
 
 pipeline = rs.pipeline()
@@ -126,15 +132,78 @@ for r in range(13):
 
     #####################################################
 
-    # Make the first video
-    config.enable_record_to_file(
-        f'{path_to_file}{file_name_str}{pot_number}.bag')  # the name of the file needs to change at every pot and will go from 1 to 65
+    # # Make the first video
+    # config.enable_record_to_file(
+    #     f'{path_to_file}{file_name_str}{pot_number}.bag')  # the name of the file needs to change at every pot and will go from 1 to 65
+    # pipeline.start(config)
+    # start = time.time()
+    # while time.time() - start < 2:
+    #     pipeline.wait_for_frames().keep()
+    # pipeline.stop()
+    # print(f'video {pot_number} has been recorded and saved')
+
+    # Start streaming with chosen configuration
     pipeline.start(config)
-    start = time.time()
-    while time.time() - start < 2:
-        pipeline.wait_for_frames().keep()
-    pipeline.stop()
-    print(f'video {pot_number} has been recorded and saved')
+
+    # We'll use the colorizer to generate texture for our PLY
+    # (alternatively, texture can be obtained from color or infrared stream)
+    colorizer = rs.colorizer()
+
+    try:
+        
+        # Wait for the next set of frames from the camera
+        frames = pipe.wait_for_frames()
+        depth_frame = frames.get_depth_frame()
+        color_frame = frames.get_color_frame()
+
+        #if not depth_frame or not color_frame:
+        #    continue
+
+        colorized = colorizer.process(frames)
+
+        # Create save_to_ply object
+        ply = rs.save_to_ply("ply.ply")
+
+        # Set options to the desired values
+        # In this example we'll generate a textual PLY with normals (mesh is already created by default)
+        ply.set_option(rs.save_to_ply.option_ply_binary, False)
+        ply.set_option(rs.save_to_ply.option_ply_normals, True)
+
+        print("Saving to ply.ply...")
+        # Apply the processing block to the frameset which contains the depth frame and the texture
+        ply.process(colorized)
+        print("Done")
+
+        #time.sleep(5)
+
+        # Convert images to numpy arrays
+        depth_image = np.asanyarray(depth_frame.get_data())
+        color_image = np.asanyarray(color_frame.get_data())
+
+        # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
+        depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+
+        # Stack both images horizontally
+        images = np.hstack((color_image, depth_colormap))
+
+        # Saving the image 
+        print("Saving to images")
+        cv2.imwrite('png.png', color_image) 
+        cv2.imwrite('depth.png', depth_colormap) 
+        print("Done")
+
+        # Show images
+        cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
+        cv2.imshow('RealSense', images)
+        cv2.waitKey(1)
+        
+        #cv2.waitKey(0)
+        #time.sleep(5)    
+        
+    finally:
+        pipeline.stop()
+
+
 
     ##########################################Paula addition####################################
     # file_name_bag = f'{path_to_file}{file_name_str}{pot_number}.bag'
@@ -162,15 +231,66 @@ for r in range(13):
 
         #####################################################
 
-        # Record video
-        config.enable_record_to_file(f'{path_to_file}{file_name_str}{pot_number}.bag')
+        # Start streaming with chosen configuration
         pipeline.start(config)
-        start = time.time()
-        while time.time() - start < 2:
-            pipeline.wait_for_frames().keep()
-        pipeline.stop()
-        print(f'video {pot_number} has been recorded and saved')
 
+        # We'll use the colorizer to generate texture for our PLY
+        # (alternatively, texture can be obtained from color or infrared stream)
+        colorizer = rs.colorizer()
+
+        try:
+            
+            # Wait for the next set of frames from the camera
+            frames = pipe.wait_for_frames()
+            depth_frame = frames.get_depth_frame()
+            color_frame = frames.get_color_frame()
+
+            #if not depth_frame or not color_frame:
+            #    continue
+
+            colorized = colorizer.process(frames)
+
+            # Create save_to_ply object
+            ply = rs.save_to_ply("ply.ply")
+
+            # Set options to the desired values
+            # In this example we'll generate a textual PLY with normals (mesh is already created by default)
+            ply.set_option(rs.save_to_ply.option_ply_binary, False)
+            ply.set_option(rs.save_to_ply.option_ply_normals, True)
+
+            print("Saving to ply.ply...")
+            # Apply the processing block to the frameset which contains the depth frame and the texture
+            ply.process(colorized)
+            print("Done")
+
+            #time.sleep(5)
+
+            # Convert images to numpy arrays
+            depth_image = np.asanyarray(depth_frame.get_data())
+            color_image = np.asanyarray(color_frame.get_data())
+
+            # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
+            depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+
+            # Stack both images horizontally
+            images = np.hstack((color_image, depth_colormap))
+
+            # Saving the image 
+            print("Saving to images")
+            cv2.imwrite('png.png', color_image) 
+            cv2.imwrite('depth.png', depth_colormap) 
+            print("Done")
+
+            # Show images
+            cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
+            cv2.imshow('RealSense', images)
+            cv2.waitKey(1)
+            
+            #cv2.waitKey(0)
+            #time.sleep(5)    
+            
+        finally:
+            pipeline.stop()
         ##########################################Paula addition####################################
         # file_name_bag = f'{path_to_file}{file_name_str}{pot_number}.bag'
         # file_name = f'{path_to_file}{file_name_str}{pot_number}'
