@@ -2,11 +2,6 @@ import sys
 
 sys.path.append("..")
 from MachineMotion import *
-import pyrealsense2 as rs
-import time
-from datetime import datetime
-import numpy as np
-import cv2
 
 #### Machine Motion initialization ####
 
