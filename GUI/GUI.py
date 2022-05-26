@@ -105,7 +105,7 @@ class Page1(QWidget):
             sheet.cell(row = c+2, column = 1).value = self.species_list[c].text()
             sheet.cell(row = c+2, column = 2).value = self.row_list[c].text()
         wb.save('SpeciesSheet.xlsx')
-        os.system("python3 sheetupdateSpecies.py")
+        os.system("python sheetupdateSpecies.py")
         #time.sleep(0.1)
         
         page2 = Page2()
@@ -156,7 +156,7 @@ class Page2(QWidget):
             for c in range(0,len(self.snaps)):
                 sheet.cell(row = c+2, column = 3).value = self.snaps[c].text()
             wb.save('SpeciesSheet.xlsx')
-            os.system("python3 sheetupdatePictures.py")
+            os.system("python sheetupdatePictures.py")
             page3 = Page3()
             mwin.addWidget(page3)
             mwin.setCurrentIndex(mwin.currentIndex()+1)
@@ -210,7 +210,8 @@ class Page3(QWidget):
             self.mm.configAxisDirection(axis, directions[axis-2])
         self.mm.emitAcceleration(50)
         self.mm.emitSpeed(80)
-        path = os.getcwd()+'\\out\\build\\x64-Debug\\RemoteCli.exe'
+        #path = os.getcwd()+'\\out\\build\\x64-Debug\\RemoteCli.exe'
+        path = os.getcwd()+'\\RemoteCli.exe'
         
         df  = pd.read_excel('ImagesSheet.xlsx')
         colvalues = df[['ImagesCount']].values
