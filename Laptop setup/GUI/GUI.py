@@ -441,7 +441,8 @@ class Page3(QWidget):
 
 def filerename(pot):
     global state
-    time.sleep(2)
+    #time.sleep(2)
+    time.sleep(10) #changed to 10 to test since file renaming not working
     t = str(int(time.time()))
     for fname in os.listdir('.'):
         if fname.startswith('DSC'):
