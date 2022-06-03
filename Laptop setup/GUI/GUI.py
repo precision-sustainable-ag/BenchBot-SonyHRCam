@@ -4,11 +4,102 @@ from MachineMotion import *
 from PyQt6 import QtWidgets
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import *
+import paramiko
+import socket
+import numpy as np
+
+HOST = "192.168.7.3"  # The server's hostname or IP address
+PORT = 65432  # The port used by the server
+
+lenRobot = 133 # Length of the robot (between front and back sensors) measured in cm
 
 global stop_exec
 global process_complete
 global state
 state = 'NC' # for now change this to have files renamed with the state you are in
+
+############################### Ultrasonic sensors and laptop-pi communication functions ###############################
+
+# Helper function for getting disntance measurements from sensor
+def getDistances(s, offsets):
+    # Number of queries of sensor measurements
+    N = 3
+
+    dist_list = np.zeros((N, 6))
+    dist_raw = np.zeros((N, 6))
+
+    for k in range(0, N):
+        # Sending a request for data and receiving it
+        s.sendall(b" ")
+        data = s.recv(1024)
+        time.sleep(0.25)
+
+        # Parsing the measurements
+        for i, item in enumerate(data.split()):
+            dist_raw[k, i] = float(item)
+            dist_list[k, i] = float(item) - offsets[i % 3]
+    # print(dist_raw)
+    # print(dist_list)
+    dist_list = np.median(dist_list, 0)
+
+    return dist_list
+
+
+# Helper function for computing orientation of robot
+def findOrientation(Dist, lenRobot):
+    R1 = Dist[0]
+    R2 = Dist[1]
+    fac = 1
+
+    d = lenRobot
+
+    if R1 == R2:
+        return 0
+    elif R1 > R2:
+        R1 = Dist[1]
+        R2 = Dist[0]
+        fac = -1
+
+    a = d * R1 / (R2 - R1)
+
+    tmp = a * R1 / np.sqrt(np.power(a, 2) + np.power(R1, 2))
+    p1 = np.array([-R1 * tmp / a, tmp])
+
+    tmp = (a + d) * R2 / np.sqrt(np.power(a + d, 2) + np.power(R2, 2))
+    p2 = np.array([(a + d) * tmp / R2 - np.sqrt(np.power(a, 2) + np.power(R1, 2)), tmp])
+
+    C2 = np.sqrt(np.power(a + d, 2) + np.power(R2, 2)) - np.sqrt(np.power(a, 2) + np.power(R1, 2))
+
+    dp = p2 - p1
+    dp[1] = fac * dp[1]
+    theta = np.arctan2(dp[1], dp[0])
+
+    return theta
+
+############################ End Ultrasonic sensors and laptop-pi communication functions #############################
+
+########################################## Establish connection with pi #############################################
+
+## INITIALIZING SERVER IN RPI
+
+ssh = paramiko.SSHClient()
+ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+ssh.connect(HOST, username='benchbot', password='bb-semi-field')
+ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command('python /home/benchbot/ultrasonic_calibration/RPI_ServerSensors.py &')
+time.sleep(2)
+
+
+## CONNECTING TO RPI SERVER
+
+# Setting up the connection
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect((HOST, PORT))
+
+
+## LOADING OFFSETS
+offsets = np.loadtxt('SensorOffsets.csv')
+
+########################################## End Establish connection with pi ###########################################
 
 class mainWindow(QWidget):
     def __init__(self):
@@ -237,7 +328,7 @@ class Page3(QWidget):
                 row += 1
                 continue
             else:
-                c = int(600/(j-1)) #total distance between home and end sensor
+                c = int(1000/(j-1)) #total distance between home and end sensor
                 for i in range(1,j):
                     if stop_exec:
                         break
