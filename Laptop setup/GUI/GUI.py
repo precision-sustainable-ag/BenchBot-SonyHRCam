@@ -317,14 +317,37 @@ class Page3(QWidget):
         os.chdir(os.getcwd()+'\\Images')
         
         dist = 300 #distance between rows of pots
-        positions = [dist, dist] #position variable
+        #positions = [dist, dist] #position variable
         row = 1
         for j in pots:
             if j==0:
                 if stop_exec:
                     break
-                self.mm.moveRelativeCombined(wheelMotors, positions)
-                self.mm.waitForMotionCompletion()
+                ## ultrasonic sensor feed + bot movement row to row (Edgar's code) ##
+                for k in range(0, 14):
+                    # Getting distance measurements
+                    dist_list = getDistances(s, offsets)
+                    print(np.round(dist_list, 1))
+
+                    # Getting angle
+                    angRight = -findOrientation(dist_list[1:3], lenRobot)
+                    angLeft = findOrientation(dist_list[4:6], lenRobot)
+                    ang = np.array([angRight, angLeft, (angRight + angLeft) / 2])
+                    print(np.round(ang * 180 / np.pi, 1))
+
+                    # Computing feedback
+                    Kp = 0.02
+                    Kd = 0.02
+                    U = Kp * (10 - dist_list[1]) - Kd * ang[
+                        0]  # Using only right hand side because of issue with sensors
+
+                    posFeedback = [travelDist * (1 + U), travelDist * (1 - U)]
+                    print(posFeedback)
+
+                    mm.moveRelativeCombined(wheelMotors, posFeedback)
+                    mm.waitForMotionCompletion()
+                #self.mm.moveRelativeCombined(wheelMotors, positions)
+                #self.mm.waitForMotionCompletion()
                 row += 1
                 continue
             else:
@@ -349,8 +372,31 @@ class Page3(QWidget):
                 self.mm.moveToHome(self.camMotor)
                 self.mm.waitForMotionCompletion()
             # move the bot to next set of pots
-            self.mm.moveRelativeCombined(wheelMotors, positions)
-            self.mm.waitForMotionCompletion()
+
+            ## ultrasonic sensor feed + bot movement row to row (Edgar's code)##
+            for k in range(0, 14):
+                # Getting distance measurements
+                dist_list = getDistances(s, offsets)
+                print(np.round(dist_list, 1))
+
+                # Getting angle
+                angRight = -findOrientation(dist_list[1:3], lenRobot)
+                angLeft = findOrientation(dist_list[4:6], lenRobot)
+                ang = np.array([angRight, angLeft, (angRight + angLeft) / 2])
+                print(np.round(ang * 180 / np.pi, 1))
+
+                # Computing feedback
+                Kp = 0.02
+                Kd = 0.02
+                U = Kp * (10 - dist_list[1]) - Kd * ang[0]  # Using only right hand side because of issue with sensors
+
+                posFeedback = [travelDist * (1 + U), travelDist * (1 - U)]
+                print(posFeedback)
+
+                mm.moveRelativeCombined(wheelMotors, posFeedback)
+                mm.waitForMotionCompletion()
+            # self.mm.moveRelativeCombined(wheelMotors, positions)
+            # self.mm.waitForMotionCompletion()
             row += 1
 
         if stop_exec:
