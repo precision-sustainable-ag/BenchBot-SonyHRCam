@@ -97,7 +97,9 @@ s.connect((HOST, PORT))
 
 
 ## LOADING OFFSETS
-offsets = np.loadtxt('SensorOffsets.csv')
+offsets = np.loadtxt('SensorOffsets.csv', delimiter=',', skiprows = 1)# delimiter added
+
+print(offsets)
 
 ########################################## End Establish connection with pi ###########################################
 
@@ -295,14 +297,14 @@ class Page3(QWidget):
         self.mm.configAxisDirection(self.camMotor, DIRECTION.POSITIVE)
 
         wheelMotors = [2,3]
-        directions = ["positive","negative"]
+        directions = ["negative","positive"]
         for axis in wheelMotors:
             self.mm.configAxis(axis, MICRO_STEPS.ustep_8, MECH_GAIN.enclosed_timing_belt_mm_turn)
             self.mm.configAxisDirection(axis, directions[axis-2])
         self.mm.emitAcceleration(50)
         self.mm.emitSpeed(80)
         #path = os.getcwd()+'\\out\\build\\x64-Debug\\RemoteCli.exe'
-        path = os.getcwd()+'\\RemoteCli.exe'
+        path = os.getcwd()+'\\RemoteCli\\RemoteCli.exe'
         
         df  = pd.read_excel('ImagesSheet.xlsx')
         colvalues = df[['ImagesCount']].values
@@ -324,28 +326,30 @@ class Page3(QWidget):
                 if stop_exec:
                     break
                 ## ultrasonic sensor feed + bot movement row to row (Edgar's code) ##
-                for k in range(0, 14):
-                    # Getting distance measurements
-                    dist_list = getDistances(s, offsets)
-                    print(np.round(dist_list, 1))
+                # Getting distance measurements
+                dist_list = getDistances(s, offsets)
+                print(np.round(dist_list, 1))
 
-                    # Getting angle
-                    angRight = -findOrientation(dist_list[1:3], lenRobot)
-                    angLeft = findOrientation(dist_list[4:6], lenRobot)
-                    ang = np.array([angRight, angLeft, (angRight + angLeft) / 2])
-                    print(np.round(ang * 180 / np.pi, 1))
+                # Getting angle
+                print('debug_distList=', dist_list)
+                print('debug_distList[0]=', dist_list[0])
+                print('debug_distList[1]=', dist_list[1])
+                angRight = -findOrientation(dist_list,lenRobot)
+                angLeft = findOrientation(dist_list[4:6],lenRobot)
+                ang = np.array([angRight, angLeft, (angRight + angLeft)/2])
+                print('debug_angle=', ang)
+                print(np.round(ang * 180 / np.pi, 1))
 
-                    # Computing feedback
-                    Kp = 0.02
-                    Kd = 0.02
-                    U = Kp * (10 - dist_list[1]) - Kd * ang[
-                        0]  # Using only right hand side because of issue with sensors
+                # Computing feedback
+                Kp = 0.02
+                Kd = 0.02
+                U = Kp * (10 - dist_list[1]) - Kd * ang[0]  # Using only right hand side because of issue with sensors
 
-                    posFeedback = [travelDist * (1 + U), travelDist * (1 - U)]
-                    print(posFeedback)
+                posFeedback = [dist* (1 + U), dist* (1 - U)]
+                print(posFeedback)
 
-                    mm.moveRelativeCombined(wheelMotors, posFeedback)
-                    mm.waitForMotionCompletion()
+                self.mm.moveRelativeCombined(wheelMotors, posFeedback)
+                self.mm.waitForMotionCompletion()
                 #self.mm.moveRelativeCombined(wheelMotors, positions)
                 #self.mm.waitForMotionCompletion()
                 row += 1
@@ -374,27 +378,31 @@ class Page3(QWidget):
             # move the bot to next set of pots
 
             ## ultrasonic sensor feed + bot movement row to row (Edgar's code)##
-            for k in range(0, 14):
-                # Getting distance measurements
-                dist_list = getDistances(s, offsets)
-                print(np.round(dist_list, 1))
+            # Getting distance measurements
+            dist_list = getDistances(s, offsets)
+            print(np.round(dist_list, 1))
 
-                # Getting angle
-                angRight = -findOrientation(dist_list[1:3], lenRobot)
-                angLeft = findOrientation(dist_list[4:6], lenRobot)
-                ang = np.array([angRight, angLeft, (angRight + angLeft) / 2])
-                print(np.round(ang * 180 / np.pi, 1))
+            # Getting angle
+            #angRight = -findOrientation(dist_list[1:3],lenRobot)
+            print('debug_distList=', dist_list)
+            print('debug_distList[0]=', dist_list[0])
+            print('debug_distList[1]=', dist_list[1])
+            angRight = -findOrientation(dist_list,lenRobot)
+            angLeft = findOrientation(dist_list[4:6],lenRobot)
+            ang = np.array([angRight, angLeft, (angRight + angLeft)/2])
+            print('debug_angle=', ang)
+            print(np.round(ang*180/np.pi,1))
 
-                # Computing feedback
-                Kp = 0.02
-                Kd = 0.02
-                U = Kp * (10 - dist_list[1]) - Kd * ang[0]  # Using only right hand side because of issue with sensors
+            # Computing feedback
+            Kp = 0.02
+            Kd = 0.02
+            U = Kp * (10 - dist_list[1]) - Kd * ang[0]  # Using only right hand side because of issue with sensors
 
-                posFeedback = [travelDist * (1 + U), travelDist * (1 - U)]
-                print(posFeedback)
+            posFeedback = [dist * (1 + U), dist* (1 - U)]
+            print('posfeedback=',posFeedback)
 
-                mm.moveRelativeCombined(wheelMotors, posFeedback)
-                mm.waitForMotionCompletion()
+            self.mm.moveRelativeCombined(wheelMotors, posFeedback)
+            self.mm.waitForMotionCompletion()
             # self.mm.moveRelativeCombined(wheelMotors, positions)
             # self.mm.waitForMotionCompletion()
             row += 1
@@ -442,7 +450,7 @@ class Page3(QWidget):
 def filerename(pot):
     global state
     #time.sleep(2)
-    time.sleep(10) #changed to 10 to test since file renaming not working
+    time.sleep(3) #changed to 10 to test since file renaming not working
     t = str(int(time.time()))
     for fname in os.listdir('.'):
         if fname.startswith('DSC'):

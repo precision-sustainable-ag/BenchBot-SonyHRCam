@@ -16,7 +16,7 @@ print("--> Resetting system")
 mm.resetSystem()
 
 # Configure the axis number 1, 8 uSteps and 10 mm / turn for a ball screw linear drive
-axis = AXIS_NUMBER.DRIVE1
+axis = AXIS_NUMBER.DRIVE2
 uStep = MICRO_STEPS.ustep_8
 mechGain = MECH_GAIN.ballscrew_10mm_turn
 mm.configAxis(axis, uStep, mechGain)
@@ -30,7 +30,7 @@ print("Axis direction set to " + str(ax_direction))
 
 # Relative Move Parameters
 speed = 50
-acceleration = 100
+acceleration = 80
 
 # Load Relative Move Parameters
 mm.emitSpeed(speed)
