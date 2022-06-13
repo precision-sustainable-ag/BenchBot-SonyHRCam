@@ -29,7 +29,7 @@ mm.configAxisDirection(axis, ax_direction)
 print("Axis direction set to " + str(ax_direction))
 
 # Relative Move Parameters
-speed = 50
+speed = 10
 acceleration = 80
 
 # Load Relative Move Parameters

@@ -3,10 +3,17 @@ import socket
 import time
 import numpy as np
 
+state = 'MD' # for now change this to have files renamed with the state you are in
+lenRobot = 133  # Length of the robot (between front and back sensors) measured in cm
+widRobot =215 # Width of the robot (distance between two front wheels) in cm
+pi_username = 'benchbot' # if you haven't changed your pi's name the default username is 'pi'
+pi_password = 'bb-semi-field' # if you haven't changed your pi's password, the default is 'raspberrypi'
+distTravel = 300
+wheelMotors = [2, 3] # if BB moving backwards change the motors order to [3,2]
+
+
 HOST = "192.168.7.3"  # The server's hostname or IP address
 PORT = 65432  # The port used by the server
-
-lenRobot = 133 # Length of the robot (between front and back sensors) measured in cm
 
 # Helper function for getting disntance measurements from sensor
 def getDistances(s,offsets):
@@ -27,42 +34,25 @@ def getDistances(s,offsets):
         for i,item in enumerate(data.split()):
             dist_raw[k,i] = float(item)
             dist_list[k,i] = float(item) - offsets[i%3]
-    #print(dist_raw)
-    #print(dist_list)
+    print('debug_dist_raw', dist_raw)
+    print('debug_dist_list', dist_list)
     dist_list = np.median(dist_list,0)
     
     return dist_list
 
 
 # Helper function for computing orientation of robot
-def findOrientation(Dist,lenRobot):
-    R1 = Dist[0]
-    R2 = Dist[1]
-    fac = 1
 
-    d = lenRobot
-
-    if R1==R2:
-        return 0
-    elif R1>R2:
-        R1 = Dist[1]
-        R2 = Dist[0]
-        fac = -1
-
-    a = d*R1/(R2-R1)
-
-    tmp = a*R1/np.sqrt(np.power(a,2)+np.power(R1,2))
-    p1 = np.array([-R1*tmp/a,tmp])
-
-    tmp = (a+d)*R2/np.sqrt(np.power(a+d,2)+np.power(R2,2))
-    p2 = np.array([(a+d)*tmp/R2-np.sqrt(np.power(a,2)+np.power(R1,2)),tmp])
-
-    C2 = np.sqrt(np.power(a+d,2)+np.power(R2,2))-np.sqrt(np.power(a,2)+np.power(R1,2))
-
-    dp = p2-p1
-    dp[1] = fac*dp[1]
-    theta = np.arctan2(dp[1],dp[0])
-
+def findOrientation(Dist, lenRobot):
+    '''
+    :param Dist: np array. Average of N distances measured by the ultrasonic sensors. Array[0]=
+    front right sensor, Array[1]= back right sensor.
+    :param lenRobot: distance in cm from front right to back right sensor
+    :return: angle of drift from straight trajectory
+    '''
+    print('Dist[0]=', Dist[0])
+    print('Dist[1]=', Dist[1])
+    theta=np.arctan2((Dist[0]-Dist[1]), lenRobot)*180/np.pi
     return theta
 
 ## INITIALIZING SERVER IN RPI
@@ -102,7 +92,8 @@ print("--> Resetting system")
 mm.resetSystem()
 
 wheelMotors = [2,3]
-directions = ["positive","negative"]
+#directions = ["positive","negative"]
+directions = ["negative","positive"]
 for axis in wheelMotors:
     mm.configAxis(axis, MICRO_STEPS.ustep_8, MECH_GAIN.enclosed_timing_belt_mm_turn)
     mm.configAxisDirection(axis, directions[axis-2])
@@ -115,30 +106,23 @@ dist = 300
 
 ## MAIN CONTROL LOOP
 
-for k in range(0,14):
-    print('first line inside loop')
-    # Getting distance measurements
-    dist_list = getDistances(s,offsets)
-    print(np.round(dist_list,1))
-
+for k in range(0,50):
+    dist_corrected = getDistances(s, offsets)
     # Getting angle
-    #angRight = -findOrientation(dist_list[1:3],lenRobot)
-    print('debug_distList=', dist_list)
-    print('debug_distList[0]=', dist_list[0])
-    print('debug_distList[1]=', dist_list[1])
-    angRight = -findOrientation(dist_list,lenRobot)
-    angLeft = findOrientation(dist_list[4:6],lenRobot)
-    ang = np.array([angRight, angLeft, (angRight + angLeft)/2])
+    ang = findOrientation(dist_corrected, lenRobot)
     print('debug_angle=', ang)
-    print(np.round(ang*180/np.pi,1))
 
-    # Computing feedback
-    Kp = 0.02
-    Kd = 0.02
-    U = Kp*(10-dist_list[1])-Kd*ang[0] # Using only right hand side because of issue with sensors
+    #Calculate how much distance motor needs to move to align platform
+    d_correction_mm = 2*np.pi*widRobot*(abs(ang)/360)*10
+    print('debug_d_correction=', d_correction_mm)
+    #Create if statement to indicate which motor moves
+    
+    if ang > 0.5:
+        mm.moveRelative(wheelMotors[1], d_correction_mm)
+        mm.waitForMotionCompletion()
+    elif ang < -0.5:
+        mm.moveRelative(wheelMotors[0], d_correction_mm)
+        mm.waitForMotionCompletion()
 
-    posFeedback = [dist*(1+U), dist*(1-U)]
-    print('postfeedback=',posFeedback)
-
-    mm.moveRelativeCombined(wheelMotors, posFeedback)
+    mm.moveRelativeCombined(wheelMotors, [distTravel, distTravel])
     mm.waitForMotionCompletion()

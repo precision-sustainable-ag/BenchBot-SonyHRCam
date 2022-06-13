@@ -1,3 +1,15 @@
+# Before getting started, some things that you may need to change on the script
+# line 25 change your state to 'MD', 'NC' or 'TX'
+# Function def filerename(pot), change if fname.startswith('MDX'):, ('MDX') to 'NCX' ot 'TXX' 
+
+state = 'MD' # for now change this to have files renamed with the state you are in
+lenRobot = 133  # Length of the robot (between front and back sensors) measured in cm
+widRobot =215 # Width of the robot (distance between two front wheels) in cm
+pi_username = 'benchbot' # if you haven't changed your pi's name the default username is 'pi'
+pi_password = 'bb-semi-field' # if you haven't changed your pi's password, the default is 'raspberrypi'
+distTravel = 300
+wheelMotors = [2, 3] # if BB moving backwards change the motors order to [3,2]
+
 import os, sys, time, pandas as pd, openpyxl, threading
 sys.path.append("..")
 from MachineMotion import *
@@ -7,16 +19,14 @@ from PyQt6.QtWidgets import *
 import paramiko
 import socket
 import numpy as np
+from datetime import date
 
 HOST = "192.168.7.3"  # The server's hostname or IP address
 PORT = 65432  # The port used by the server
 
-lenRobot = 133 # Length of the robot (between front and back sensors) measured in cm
-
 global stop_exec
 global process_complete
-global state
-state = 'NC' # for now change this to have files renamed with the state you are in
+#global state
 
 ############################### Ultrasonic sensors and laptop-pi communication functions ###############################
 
@@ -47,33 +57,15 @@ def getDistances(s, offsets):
 
 # Helper function for computing orientation of robot
 def findOrientation(Dist, lenRobot):
-    R1 = Dist[0]
-    R2 = Dist[1]
-    fac = 1
-
-    d = lenRobot
-
-    if R1 == R2:
-        return 0
-    elif R1 > R2:
-        R1 = Dist[1]
-        R2 = Dist[0]
-        fac = -1
-
-    a = d * R1 / (R2 - R1)
-
-    tmp = a * R1 / np.sqrt(np.power(a, 2) + np.power(R1, 2))
-    p1 = np.array([-R1 * tmp / a, tmp])
-
-    tmp = (a + d) * R2 / np.sqrt(np.power(a + d, 2) + np.power(R2, 2))
-    p2 = np.array([(a + d) * tmp / R2 - np.sqrt(np.power(a, 2) + np.power(R1, 2)), tmp])
-
-    C2 = np.sqrt(np.power(a + d, 2) + np.power(R2, 2)) - np.sqrt(np.power(a, 2) + np.power(R1, 2))
-
-    dp = p2 - p1
-    dp[1] = fac * dp[1]
-    theta = np.arctan2(dp[1], dp[0])
-
+    '''
+    :param Dist: np array. Average of N distances measured by the ultrasonic sensors. Array[0]=
+    front right sensor, Array[1]= back right sensor.
+    :param lenRobot: distance in cm from front right to back right sensor
+    :return: angle of drift from straight trajectory
+    '''
+    print('Dist[0]=', Dist[0])
+    print('Dist[1]=', Dist[1])
+    theta=np.arctan2((Dist[0]-Dist[1]), lenRobot)*180/np.pi
     return theta
 
 ############################ End Ultrasonic sensors and laptop-pi communication functions #############################
@@ -84,7 +76,7 @@ def findOrientation(Dist, lenRobot):
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect(HOST, username='benchbot', password='bb-semi-field')
+ssh.connect(HOST, username=pi_username, password=pi_password)
 ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command('python /home/benchbot/ultrasonic_calibration/RPI_ServerSensors.py &')
 time.sleep(2)
 
@@ -296,14 +288,13 @@ class Page3(QWidget):
         self.mm.configAxis(self.camMotor, MICRO_STEPS.ustep_8, MECH_GAIN.ballscrew_10mm_turn)
         self.mm.configAxisDirection(self.camMotor, DIRECTION.POSITIVE)
 
-        wheelMotors = [2,3]
+        #wheelMotors = [2,3]
         directions = ["negative","positive"]
         for axis in wheelMotors:
             self.mm.configAxis(axis, MICRO_STEPS.ustep_8, MECH_GAIN.enclosed_timing_belt_mm_turn)
             self.mm.configAxisDirection(axis, directions[axis-2])
         self.mm.emitAcceleration(50)
         self.mm.emitSpeed(80)
-        #path = os.getcwd()+'\\out\\build\\x64-Debug\\RemoteCli.exe'
         path = os.getcwd()+'\\RemoteCli\\RemoteCli.exe'
         
         df  = pd.read_excel('ImagesSheet.xlsx')
@@ -316,45 +307,62 @@ class Page3(QWidget):
         
         self.mm.releaseEstop()
         self.mm.resetSystem()
-        os.chdir(os.getcwd()+'\\Images')
-        
-        dist = 300 #distance between rows of pots
-        #positions = [dist, dist] #position variable
+
+        # Create new directory where today's images will be saved.
+        dirName=f'{state}_{date.today()}'
+        if dirName in os.listdir():
+            os.chdir(f'{os.getcwd()}\{dirName}')
+            print('Folder already created')
+        else:
+            os.mkdir(f'{os.getcwd()}\{dirName}')
+            os.chdir(f'{os.getcwd()}\{dirName}')
+            
         row = 1
         for j in pots:
             if j==0:
                 if stop_exec:
                     break
-                ## ultrasonic sensor feed + bot movement row to row (Edgar's code) ##
-                # Getting distance measurements
-                dist_list = getDistances(s, offsets)
-                print(np.round(dist_list, 1))
+                dist_corrected = getDistances(s, offsets)
 
                 # Getting angle
-                print('debug_distList=', dist_list)
-                print('debug_distList[0]=', dist_list[0])
-                print('debug_distList[1]=', dist_list[1])
-                angRight = -findOrientation(dist_list,lenRobot)
-                angLeft = findOrientation(dist_list[4:6],lenRobot)
-                ang = np.array([angRight, angLeft, (angRight + angLeft)/2])
+                ang = findOrientation(dist_corrected, lenRobot)
                 print('debug_angle=', ang)
-                print(np.round(ang * 180 / np.pi, 1))
 
-                # Computing feedback
-                Kp = 0.02
-                Kd = 0.02
-                U = Kp * (10 - dist_list[1]) - Kd * ang[0]  # Using only right hand side because of issue with sensors
+                #Calculate how much distance motor needs to move to align platform
+                d_correction_mm = 2*np.pi*widRobot*(abs(ang)/360)*10
+                print('debug_d_correction_mm=', d_correction_mm)
+                #Create if statement to indicate which motor moves
 
-                posFeedback = [dist* (1 + U), dist* (1 - U)]
-                print(posFeedback)
+                if ang > 0.5:
+                    self.mm.moveRelative(wheelMotors[1], d_correction_mm)
+                    self.mm.waitForMotionCompletion()
+                elif ang < -0.5:
+                    self.mm.moveRelative(wheelMotors[0], d_correction_mm)
+                    self.mm.waitForMotionCompletion()
 
-                self.mm.moveRelativeCombined(wheelMotors, posFeedback)
+                self.mm.moveRelativeCombined(wheelMotors, [distTravel, distTravel])
                 self.mm.waitForMotionCompletion()
-                #self.mm.moveRelativeCombined(wheelMotors, positions)
-                #self.mm.waitForMotionCompletion()
                 row += 1
                 continue
             else:
+                dist_corrected = getDistances(s, offsets)
+
+                # Getting angle
+                ang = findOrientation(dist_corrected, lenRobot)
+                print('debug_angle=', ang)
+
+                #Calculate how much distance motor needs to move to align platform
+                d_correction_mm = 2*np.pi*widRobot*(abs(ang)/360)*10
+                print('debug_d_correction_mm=', d_correction_mm)
+                #Create if statement to indicate which motor moves
+
+                if ang > 0.5:
+                    self.mm.moveRelative(wheelMotors[1], d_correction_mm)
+                    self.mm.waitForMotionCompletion()
+                elif ang < -0.5:
+                    self.mm.moveRelative(wheelMotors[0], d_correction_mm)
+                    self.mm.waitForMotionCompletion()
+                    
                 c = int(1000/(j-1)) #total distance between home and end sensor
                 for i in range(1,j):
                     if stop_exec:
@@ -375,37 +383,10 @@ class Page3(QWidget):
                 #move camera plate to start location
                 self.mm.moveToHome(self.camMotor)
                 self.mm.waitForMotionCompletion()
-            # move the bot to next set of pots
 
-            ## ultrasonic sensor feed + bot movement row to row (Edgar's code)##
-            # Getting distance measurements
-            dist_list = getDistances(s, offsets)
-            print(np.round(dist_list, 1))
-
-            # Getting angle
-            #angRight = -findOrientation(dist_list[1:3],lenRobot)
-            print('debug_distList=', dist_list)
-            print('debug_distList[0]=', dist_list[0])
-            print('debug_distList[1]=', dist_list[1])
-            angRight = -findOrientation(dist_list,lenRobot)
-            angLeft = findOrientation(dist_list[4:6],lenRobot)
-            ang = np.array([angRight, angLeft, (angRight + angLeft)/2])
-            print('debug_angle=', ang)
-            print(np.round(ang*180/np.pi,1))
-
-            # Computing feedback
-            Kp = 0.02
-            Kd = 0.02
-            U = Kp * (10 - dist_list[1]) - Kd * ang[0]  # Using only right hand side because of issue with sensors
-
-            posFeedback = [dist * (1 + U), dist* (1 - U)]
-            print('posfeedback=',posFeedback)
-
-            self.mm.moveRelativeCombined(wheelMotors, posFeedback)
-            self.mm.waitForMotionCompletion()
-            # self.mm.moveRelativeCombined(wheelMotors, positions)
-            # self.mm.waitForMotionCompletion()
-            row += 1
+                self.mm.moveRelativeCombined(wheelMotors, [distTravel, distTravel])
+                self.mm.waitForMotionCompletion()
+                row += 1
 
         if stop_exec:
             self.stop
@@ -453,7 +434,7 @@ def filerename(pot):
     time.sleep(3) #changed to 10 to test since file renaming not working
     t = str(int(time.time()))
     for fname in os.listdir('.'):
-        if fname.startswith('DSC'):
+        if fname.startswith('MDX'):
             if fname.endswith('.JPG'):
                 dst = f"{state}_Row-{str(pot)}_{t}.JPG" 
             elif fname.endswith('.ARW'):
