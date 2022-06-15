@@ -1,14 +1,99 @@
+# Before getting started, some things that you may need to change on the script
+# line 25 change your state to 'MD', 'NC' or 'TX'
+# Function def filerename(pot), change if fname.startswith('MDX'):, ('MDX') to 'NCX' ot 'TXX' 
+
+state = 'NC' # for now change this to have files renamed with the state you are in
+lenRobot = 133  # Length of the robot (between front and back sensors) measured in cm
+widRobot =218 # Width of the robot (distance between two front wheels) in cm
+pi_username = 'pi' # if you haven't changed your pi's name the default username is 'pi'
+pi_password = 'raspberry' # if you haven't changed your pi's password, the default is 'raspberrypi'
+distTravel = 300
+wheelMotors = [2, 3] # if BB moving backwards change the motors order to [3,2]
+
 import os, sys, time, pandas as pd, openpyxl, threading
 sys.path.append("..")
 from MachineMotion import *
 from PyQt6 import QtWidgets
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import *
+import paramiko
+import socket
+import numpy as np
+from datetime import date
+
+HOST = "192.168.7.3"  # The server's hostname or IP address
+PORT = 65432  # The port used by the server
 
 global stop_exec
 global process_complete
-global state
-state = 'NC' # for now change this to have files renamed with the state you are in
+#global state
+
+############################### Ultrasonic sensors and laptop-pi communication functions ###############################
+
+# Helper function for getting disntance measurements from sensor
+def getDistances(s, offsets):
+    # Number of queries of sensor measurements
+    N = 3
+
+    dist_list = np.zeros((N, 6))
+    dist_raw = np.zeros((N, 6))
+
+    for k in range(0, N):
+        # Sending a request for data and receiving it
+        s.sendall(b" ")
+        data = s.recv(1024)
+        time.sleep(0.25)
+
+        # Parsing the measurements
+        for i, item in enumerate(data.split()):
+            dist_raw[k, i] = float(item)
+            dist_list[k, i] = float(item) - offsets[i % 3]
+    # print(dist_raw)
+    # print(dist_list)
+    dist_list = np.median(dist_list, 0)
+
+    return dist_list
+
+
+# Helper function for computing orientation of robot
+def findOrientation(Dist, lenRobot):
+    '''
+    :param Dist: np array. Average of N distances measured by the ultrasonic sensors. Array[0]=
+    front right sensor, Array[1]= back right sensor.
+    :param lenRobot: distance in cm from front right to back right sensor
+    :return: angle of drift from straight trajectory
+    '''
+    print('Dist[0]=', Dist[0])
+    print('Dist[1]=', Dist[1])
+    theta=np.arctan2((Dist[0]-Dist[1]), lenRobot)*180/np.pi
+    return theta
+
+############################ End Ultrasonic sensors and laptop-pi communication functions #############################
+
+########################################## Establish connection with pi #############################################
+
+## INITIALIZING SERVER IN RPI
+
+ssh = paramiko.SSHClient()
+ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+ssh.connect(HOST, username='pi', password='raspberry')
+ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command('python /home/pi/ultrasonic_calibration/RPI_ServerSensors.py &')
+time.sleep(2)
+
+
+## CONNECTING TO RPI SERVER
+
+# Setting up the connection
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect((HOST, PORT))
+
+
+## LOADING OFFSETS
+offsets = np.loadtxt('SensorOffsets.csv', delimiter=',', skiprows = 1)# delimiter added
+
+print(offsets)
+
+########################################## End Establish connection with pi ###########################################
 
 class mainWindow(QWidget):
     def __init__(self):
@@ -105,7 +190,7 @@ class Page1(QWidget):
             sheet.cell(row = c+2, column = 1).value = self.species_list[c].text()
             sheet.cell(row = c+2, column = 2).value = self.row_list[c].text()
         wb.save('SpeciesSheet.xlsx')
-        os.system("python3 sheetupdateSpecies.py")
+        os.system("python sheetupdateSpecies.py")
         #time.sleep(0.1)
         
         page2 = Page2()
@@ -156,7 +241,7 @@ class Page2(QWidget):
             for c in range(0,len(self.snaps)):
                 sheet.cell(row = c+2, column = 3).value = self.snaps[c].text()
             wb.save('SpeciesSheet.xlsx')
-            os.system("python3 sheetupdatePictures.py")
+            os.system("python sheetupdatePictures.py")
             page3 = Page3()
             mwin.addWidget(page3)
             mwin.setCurrentIndex(mwin.currentIndex()+1)
@@ -203,14 +288,14 @@ class Page3(QWidget):
         self.mm.configAxis(self.camMotor, MICRO_STEPS.ustep_8, MECH_GAIN.ballscrew_10mm_turn)
         self.mm.configAxisDirection(self.camMotor, DIRECTION.POSITIVE)
 
-        wheelMotors = [2,3]
-        directions = ["positive","negative"]
+        #wheelMotors = [2,3]
+        directions = ["negative","positive"]
         for axis in wheelMotors:
             self.mm.configAxis(axis, MICRO_STEPS.ustep_8, MECH_GAIN.enclosed_timing_belt_mm_turn)
             self.mm.configAxisDirection(axis, directions[axis-2])
         self.mm.emitAcceleration(50)
         self.mm.emitSpeed(80)
-        path = os.getcwd()+'\\out\\build\\x64-Debug\\RemoteCli.exe'
+        path = os.getcwd()+'\\RemoteCli\\RemoteCli.exe'
         
         df  = pd.read_excel('ImagesSheet.xlsx')
         colvalues = df[['ImagesCount']].values
@@ -222,21 +307,63 @@ class Page3(QWidget):
         
         self.mm.releaseEstop()
         self.mm.resetSystem()
-        os.chdir(os.getcwd()+'\\Images')
-        
-        dist = 300 #distance between rows of pots
-        positions = [dist, dist] #position variable
+
+        # Create new directory where today's images will be saved.
+        dirName=f'{state}_{date.today()}'
+        if dirName in os.listdir():
+            os.chdir(f'{os.getcwd()}\{dirName}')
+            print('Folder already created')
+        else:
+            os.mkdir(f'{os.getcwd()}\{dirName}')
+            os.chdir(f'{os.getcwd()}\{dirName}')
+            
         row = 1
         for j in pots:
             if j==0:
                 if stop_exec:
                     break
-                self.mm.moveRelativeCombined(wheelMotors, positions)
+                dist_corrected = getDistances(s, offsets)
+
+                # Getting angle
+                ang = findOrientation(dist_corrected, lenRobot)
+                print('debug_angle=', ang)
+
+                #Calculate how much distance motor needs to move to align platform
+                d_correction_mm = 2*np.pi*widRobot*(abs(ang)/360)*10
+                print('debug_d_correction_mm=', d_correction_mm)
+                #Create if statement to indicate which motor moves
+
+                if ang > 0.5:
+                    self.mm.moveRelative(wheelMotors[0], d_correction_mm)
+                    self.mm.waitForMotionCompletion()
+                elif ang < -0.5:
+                    self.mm.moveRelative(wheelMotors[1], d_correction_mm)
+                    self.mm.waitForMotionCompletion()
+
+                self.mm.moveRelativeCombined(wheelMotors, [distTravel, distTravel])
                 self.mm.waitForMotionCompletion()
                 row += 1
                 continue
             else:
-                c = int(600/(j-1)) #total distance between home and end sensor
+                dist_corrected = getDistances(s, offsets)
+
+                # Getting angle
+                ang = findOrientation(dist_corrected, lenRobot)
+                print('debug_angle=', ang)
+
+                #Calculate how much distance motor needs to move to align platform
+                d_correction_mm = 2*np.pi*widRobot*(abs(ang)/360)*10
+                print('debug_d_correction_mm=', d_correction_mm)
+                #Create if statement to indicate which motor moves
+
+                if ang > 0.5:
+                    self.mm.moveRelative(wheelMotors[0], d_correction_mm)
+                    self.mm.waitForMotionCompletion()
+                elif ang < -0.5:
+                    self.mm.moveRelative(wheelMotors[1], d_correction_mm)
+                    self.mm.waitForMotionCompletion()
+                    
+                c = int(1000/(j-1)) #total distance between home and end sensor
                 for i in range(1,j):
                     if stop_exec:
                         break
@@ -256,10 +383,10 @@ class Page3(QWidget):
                 #move camera plate to start location
                 self.mm.moveToHome(self.camMotor)
                 self.mm.waitForMotionCompletion()
-            # move the bot to next set of pots
-            self.mm.moveRelativeCombined(wheelMotors, positions)
-            self.mm.waitForMotionCompletion()
-            row += 1
+
+                self.mm.moveRelativeCombined(wheelMotors, [distTravel, distTravel])
+                self.mm.waitForMotionCompletion()
+                row += 1
 
         if stop_exec:
             self.stop
@@ -303,10 +430,11 @@ class Page3(QWidget):
 
 def filerename(pot):
     global state
-    time.sleep(2)
+    #time.sleep(2)
+    time.sleep(3) #changed to 10 to test since file renaming not working
     t = str(int(time.time()))
     for fname in os.listdir('.'):
-        if fname.startswith('DSC'):
+        if fname.startswith('NCX'):
             if fname.endswith('.JPG'):
                 dst = f"{state}_Row-{str(pot)}_{t}.JPG" 
             elif fname.endswith('.ARW'):
