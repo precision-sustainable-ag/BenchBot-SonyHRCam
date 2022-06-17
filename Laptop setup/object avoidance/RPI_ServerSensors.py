@@ -50,13 +50,6 @@ s.listen()
 conn, addr = s.accept()
 print(f"Connected by {addr}")
 
-# Setting up sensors
-# gpio_trigger_list = [18, 17]
-# gpio_echo_list = [23, 4]
-
-# Initializing distances
-dist_list = [0.0, 0.0]
-
 while True:
     # Waiting for request
     data = conn.recv(1024)
@@ -64,8 +57,13 @@ while True:
         break
 
     json_data_recieved = json.loads(data)
-    gpio_trigger_list = json_data_recieved.get("triggers")
-    gpio_echo_list = json_data_recieved.get("echos")
+    gpio_trigger_list = json_data_recieved.get("trigger_pins")
+    gpio_echo_list = json_data_recieved.get("echo_pins")
+
+    if len(gpio_trigger_list) != len(gpio_echo_list):
+        conn.sendall(bytearray('Array size mismatch!','utf8'))
+
+    dist_list = [0.0] * len(gpio_echo_list)
 
     # Updating distances
     for k in range(0,len(gpio_trigger_list)):

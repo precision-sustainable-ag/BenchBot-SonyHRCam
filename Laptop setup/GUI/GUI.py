@@ -16,28 +16,29 @@ import json
 # Function def file_rename(pot), change if fname.startswith('MDX'):, ('MDX') to 'NCX' ot 'TXX' 
 
 STATE = 'NC' # for now change this to have files renamed with the STATE you are in
+FILE_PREFIX = 'NCX'
 ROBOT_LENGTH = 133  # Length of the robot (between front and back sensors) measured in cm
-ROBOT_WIDTH =218 # Width of the robot (distance between two front wheels) in cm
+ROBOT_WIDTH = 218 # Width of the robot (distance between two front wheels) in cm
 PI_USERNAME = 'pi' # if you haven't changed your pi's name the default username is 'pi'
 PI_PASSWORD = 'raspberry' # if you haven't changed your pi's password, the default is 'raspberrypi'
 DISTANCE_TRAVELED = 300
 WHEEL_MOTORS = [2, 3] # if BB moving backwards change the motors order to [3,2]
-NUMBER_OF_SENSORS = 2
-GPIO_TRIGGER_LIST = [18, 17]
+NUMBER_OF_SENSORS = 2 # how many sensors are attached to the benchbot
 ULTRASONIC_SENSOR_LISTS = json.dumps({
-    "triggers": [18, 17],
-    "echoes": [23, 4],
+    # the trigger pins for sensors
+    "trigger_pins": [18, 17],
+    # the echo pins for sensors
+    "echo_pins": [23, 4],
 })
-DIRECTIONS = ["positive","negative"]
+DIRECTIONS = ["positive","negative"] # reverse to move backwards or forwards
 
 
 
-HOST = "192.168.7.3"  # The server's hostname or IP address
-PORT = 65432  # The port used by the server
-
-global STOP_EXEC
-global PROCESS_COMPLETE
-#global STATE
+# Do not change these
+PI_HOST = "192.168.7.3"  # The server's hostname or IP address
+PI_PORT = 65432  # The port used by the server
+STOP_EXEC = False # global flag used to stop execution
+PROCESS_COMPLETE = False # global flag used to mark completion
 
 ############################### Ultrasonic sensors and laptop-pi communication functions ###############################
 
@@ -56,7 +57,7 @@ def get_distances(s, offsets):
         if ready[0]:
             data = s.recv(4096)
         else:
-            print("sensor error!")
+            print("Sensor error!")
 
         time.sleep(0.25)
 
@@ -71,14 +72,14 @@ def get_distances(s, offsets):
 
 
 # Helper function for computing orientation of robot
-def find_orientation(Dist, ROBOT_LENGTH):
+def find_orientation(dist):
     '''
-    :param Dist: np array. Average of N distances measured by the ultrasonic sensors. Array[0]=
+    :param dist: np array. Average of N distances measured by the ultrasonic sensors. Array[0]=
     front right sensor, Array[1]= back right sensor.
     :param ROBOT_LENGTH: distance in cm from front right to back right sensor
     :return: angle of drift from straight trajectory
     '''
-    theta=np.arctan2((Dist[0]-Dist[1]), ROBOT_LENGTH)*180/np.pi
+    theta=np.arctan2((dist[0] - dist[1]), ROBOT_LENGTH) * 180 / np.pi
     return theta
 
 
@@ -90,7 +91,7 @@ def find_orientation(Dist, ROBOT_LENGTH):
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect(HOST, username=PI_USERNAME, password=PI_PASSWORD)
+ssh.connect(PI_HOST, username=PI_USERNAME, password=PI_PASSWORD)
 ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command('python /home/{}/ultrasonic_calibration/RPI_ServerSensors.py &'.format(PI_USERNAME))
 time.sleep(5)
 
@@ -99,7 +100,7 @@ time.sleep(5)
 
 # Setting up the connection
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect((HOST, PORT))
+s.connect((PI_HOST, PI_PORT))
 s.setblocking(0)
 
 
@@ -143,12 +144,12 @@ class mainWindow(QWidget):
         self.show()
 
     def optyes(self):
-        mwin.setCurrentIndex(mwin.currentIndex()+1)
+        mwin.setCurrentIndex(mwin.currentIndex() + 1)
     
     def optno(self):
         page2 = Page2()
         mwin.addWidget(page2)
-        mwin.setCurrentIndex(mwin.currentIndex()+2)
+        mwin.setCurrentIndex(mwin.currentIndex() + 2)
 
 class Page1(QWidget):
     def __init__(self):
@@ -156,12 +157,12 @@ class Page1(QWidget):
 
         mainl = QLabel("Number of species to add/update?")
         self.total_species = QComboBox()
-        self.species_list = [None]*10
-        self.row_list = [None]*10
+        self.species_list = [None] * 10
+        self.row_list = [None] * 10
         for i in range(1, 10):
             self.total_species.addItem(str(i))
-            self.species_list[i-1] = QLineEdit()
-            self.row_list[i-1] = QLineEdit()
+            self.species_list[i - 1] = QLineEdit()
+            self.row_list[i - 1] = QLineEdit()
         self.total_species.currentIndexChanged.connect(self.update_list)
         self.earlier_cnt = 1
         
@@ -185,9 +186,9 @@ class Page1(QWidget):
         self.layout.addWidget(self.l1, 1, 2)
         self.layout.addWidget(self.l2, 1, 3)
         if(count>self.earlier_cnt):
-            for c in range(self.earlier_cnt-1,count):
-                self.layout.addWidget(self.species_list[c], c+2, 2)
-                self.layout.addWidget(self.row_list[c], c+2, 3)
+            for c in range(self.earlier_cnt - 1,count):
+                self.layout.addWidget(self.species_list[c], c + 2, 2)
+                self.layout.addWidget(self.row_list[c], c + 2, 3)
         if(count<self.earlier_cnt):
             for c in range(count,self.earlier_cnt):
                 self.layout.removeWidget(self.species_list[c])
@@ -202,15 +203,15 @@ class Page1(QWidget):
         wb = openpyxl.load_workbook('SpeciesSheet.xlsx')
         sheet = wb.active
         for c in range(0,count):
-            sheet.cell(row = c+2, column = 1).value = self.species_list[c].text()
-            sheet.cell(row = c+2, column = 2).value = self.row_list[c].text()
+            sheet.cell(row = c + 2, column = 1).value = self.species_list[c].text()
+            sheet.cell(row = c + 2, column = 2).value = self.row_list[c].text()
         wb.save('SpeciesSheet.xlsx')
         os.system("python sheetupdateSpecies.py")
         #time.sleep(0.1)
         
         page2 = Page2()
         mwin.addWidget(page2)
-        mwin.setCurrentIndex(mwin.currentIndex()+1)
+        mwin.setCurrentIndex(mwin.currentIndex() + 1)
 
 
 class Page2(QWidget):
@@ -233,9 +234,9 @@ class Page2(QWidget):
         i = 0
         self.snaps = [None] * species_names.size
         for sname in species_names:
-            self.layout.addWidget(QLabel(sname[0]), i+2, 1)
+            self.layout.addWidget(QLabel(sname[0]), i + 2, 1)
             self.snaps[i] = QLineEdit()
-            self.layout.addWidget(self.snaps[i], i+2, 2)
+            self.layout.addWidget(self.snaps[i], i + 2, 2)
             i += 1
 
         self.setLayout(self.layout)
@@ -254,12 +255,12 @@ class Page2(QWidget):
             wb = openpyxl.load_workbook('SpeciesSheet.xlsx')
             sheet = wb.active
             for c in range(0,len(self.snaps)):
-                sheet.cell(row = c+2, column = 3).value = self.snaps[c].text()
+                sheet.cell(row = c + 2, column = 3).value = self.snaps[c].text()
             wb.save('SpeciesSheet.xlsx')
             os.system("python sheetupdatePictures.py")
             page3 = Page3()
             mwin.addWidget(page3)
-            mwin.setCurrentIndex(mwin.currentIndex()+1)
+            mwin.setCurrentIndex(mwin.currentIndex() + 1)
             dlg.done(1)
         else:
             dlg.done(1)
@@ -271,14 +272,12 @@ class Page3(QWidget):
         
         # Initialize the machine motion object
         self.mm = MachineMotion(DEFAULT_IP)
-        print('mm initialized')
-
         # Remove the software stop
         print("--> Removing software stop")
         self.mm.releaseEstop()
         print("--> Resetting system")
         self.mm.resetSystem()
-        print("successfully created mm object")
+        print("Successfully created machine motion controller!")
                 
         self.camMotor = 1
 
@@ -306,35 +305,23 @@ class Page3(QWidget):
         threading.Thread(target=self.acquisition_process).start()
     
     def acquisition_process(self):
-        print("entered acquisition")
-        global STOP_EXEC
-        STOP_EXEC = False
-        global PROCESS_COMPLETE
-        PROCESS_COMPLETE = False
-
         self.mm.configAxis(self.camMotor, MICRO_STEPS.ustep_8, MECH_GAIN.ballscrew_10mm_turn)
         self.mm.configAxisDirection(self.camMotor, DIRECTION.POSITIVE)
 
-        # DIRECTIONS = ["negative","positive"]
         for axis in WHEEL_MOTORS:
             self.mm.configAxis(axis, MICRO_STEPS.ustep_8, MECH_GAIN.enclosed_timing_belt_mm_turn)
-            self.mm.configAxisDirection(axis, DIRECTIONS[axis-2])
+            self.mm.configAxisDirection(axis, DIRECTIONS[axis - 2])
         self.mm.emitAcceleration(50)
         self.mm.emitSpeed(80)
-        path = os.getcwd()+'\\RemoteCli\\RemoteCli.exe'
+        path = os.getcwd() + '\\RemoteCli\\RemoteCli.exe'
         
         df  = pd.read_excel('ImagesSheet.xlsx')
         colvalues = df[['ImagesCount']].values
         i = 0
         pots = [None] * colvalues.size
         for num in colvalues:
-            print(pots[i])
-            print(num)
             pots[i] = num[0]
-            i = i+1
-        
-        # self.mm.releaseEstop()
-        # self.mm.resetSystem()
+            i += 1
 
         # Create new directory where today's images will be saved.
         dirName=f'{STATE}_{date.today()}'
@@ -346,24 +333,19 @@ class Page3(QWidget):
             os.chdir(f'{os.getcwd()}\{dirName}')
             
         row = 1
-        print("starting for loop")
-        print(pots)
         for j in pots:
-            print(j)
-            if j==0:
-                print("j = 0")
-                if STOP_EXEC:
+            if STOP_EXEC:
                     break
+
+            if j==0:
                 dist_corrected = get_distances(s, offsets)
 
                 # Getting angle
-                ang = find_orientation(dist_corrected, ROBOT_LENGTH)
+                ang = find_orientation(dist_corrected)
                 print('debug_angle=', ang)
 
-                # ang = 0.5
-
                 #Calculate how much distance motor needs to move to align platform
-                d_correction_mm = 2*np.pi*ROBOT_WIDTH*(abs(ang)/360)*10
+                d_correction_mm = 2 * np.pi * ROBOT_WIDTH * (abs(ang) / 360) * 10
                 print('debug_d_correction_mm=', d_correction_mm)
                 #Create if statement to indicate which motor moves
 
@@ -379,18 +361,14 @@ class Page3(QWidget):
                 row += 1
                 continue
             else:
-                print("j not 0")
                 dist_corrected = get_distances(s, offsets)
-                print("finished get_distances")
 
                 # Getting angle
-                ang = find_orientation(dist_corrected, ROBOT_LENGTH)
-                # ang = 0.5
-                print("finished find_orientation")
+                ang = find_orientation(dist_corrected)
                 print('debug_angle=', ang)
 
                 #Calculate how much distance motor needs to move to align platform
-                d_correction_mm = 2*np.pi*ROBOT_WIDTH*(abs(ang)/360)*10
+                d_correction_mm = 2 * np.pi * ROBOT_WIDTH * (abs(ang) / 360) * 10
                 print('debug_d_correction_mm=', d_correction_mm)
                 #Create if statement to indicate which motor moves
 
@@ -402,13 +380,11 @@ class Page3(QWidget):
                     self.mm.waitForMotionCompletion()
                 
                 if j == 1:
-                    c = int(1000/(j)) #total distance between home and end sensor
+                    c = int(1000 / (j)) #total distance between home and end sensor
                 else:
-                    c = int(1000/(j-1)) #total distance between home and end sensor
+                    c = int(1000 / (j - 1)) #total distance between home and end sensor
 
-                for i in range(1,j):
-                    if STOP_EXEC:
-                        break
+                for i in range(1, j):
                     #Trigger capture of image
                     os.startfile(path)
                     time.sleep(15)
@@ -416,8 +392,7 @@ class Page3(QWidget):
                     #Move camera plate to next point
                     self.mm.moveRelative(self.camMotor, c)
                     self.mm.waitForMotionCompletion()
-                if STOP_EXEC:
-                    break
+                    
                 #Trigger image capture at last point
                 os.startfile(path)
                 time.sleep(15)
@@ -433,23 +408,19 @@ class Page3(QWidget):
         if STOP_EXEC:
             self.stop()
         else:
-            PROCESS_COMPLETE = True
             self.mm.triggerEstop()
             self.l1.setText('Acquisition Process Complete')
             current_time = time.time()
-            elapsed_time = int(current_time-self.start_time)
-            elapsed_hr = int(elapsed_time/3600)
-            elapsed_min = int(elapsed_time/60) - 60*elapsed_hr
-            self.l2.setText('Total time taken: '+str(elapsed_hr)+ ' hrs '+str(elapsed_min)+ ' mins')
+            elapsed_time = int(current_time - self.start_time)
+            elapsed_hr = int(elapsed_time / 3600)
+            elapsed_min = int(elapsed_time / 60) - 60 * elapsed_hr
+            self.l2.setText('Total time taken: ' + str(elapsed_hr) + ' hrs ' + str(elapsed_min) + ' mins')
         
     def stop_thread(self):
         stopping = threading.Thread(target=self.stop)
         stopping.start()
         
     def stop(self):
-        global STOP_EXEC
-        global PROCESS_COMPLETE
-        STOP_EXEC = True
         self.mm.moveToHome(self.camMotor)
         self.mm.waitForMotionCompletion()
         self.mm.triggerEstop()
@@ -458,25 +429,22 @@ class Page3(QWidget):
             self.l2.setText('     Close the Application')
 
     def update_label(self):
-        global PROCESS_COMPLETE
-        global STOP_EXEC
         if PROCESS_COMPLETE or STOP_EXEC:
             self.timer.stop()
         else:
             current_time = time.time()
-            elapsed_time = int(current_time-self.start_time)
-            elapsed_hr = int(elapsed_time/3600)
-            elapsed_min = int(elapsed_time/60) - 60*elapsed_hr
-            self.l2.setText('     Time Elapsed: '+str(elapsed_hr)+ ' hrs '+str(elapsed_min)+ ' mins')
+            elapsed_time = int(current_time - self.start_time)
+            elapsed_hr = int(elapsed_time / 3600)
+            elapsed_min = int(elapsed_time / 60) - 60 * elapsed_hr
+            self.l2.setText('     Time Elapsed: ' + str(elapsed_hr) + ' hrs ' + str(elapsed_min) + ' mins')
 
 
 def file_rename(pot):
-    global STATE
     #time.sleep(2)
     time.sleep(3) #changed to 10 to test since file renaming not working
     t = str(int(time.time()))
     for fname in os.listdir('.'):
-        if fname.startswith('NCX'):
+        if fname.startswith(FILE_PREFIX):
             if fname.endswith('.JPG'):
                 dst = f"{STATE}_Row-{str(pot)}_{t}.JPG" 
             elif fname.endswith('.ARW'):
