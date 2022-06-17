@@ -310,7 +310,7 @@ class Page3(QWidget):
         self.mm.configAxisDirection(self.camMotor, DIRECTION.POSITIVE)
 
         #wheelMotors = [2,3]
-        directions = ["negative","positive"]
+        directions = ["positive","negative"]
         for axis in wheelMotors:
             self.mm.configAxis(axis, MICRO_STEPS.ustep_8, MECH_GAIN.enclosed_timing_belt_mm_turn)
             self.mm.configAxisDirection(axis, directions[axis-2])
