@@ -9,6 +9,7 @@ GPIO.setmode(GPIO.BCM)
 
 def distance(trigger,echo):
     # set Trigger to HIGH
+    print(trigger, echo)
     GPIO.output(trigger, True)
 
     # set Trigger after 0.01ms to LOW
@@ -19,9 +20,11 @@ def distance(trigger,echo):
     StopTime = time.time()
 
     # save StartTime
+    print("start time")
     while GPIO.input(echo) == 0:
         StartTime = time.time()
 
+    print("stop time")
     # save time of arrival
     while GPIO.input(echo) == 1:
         StopTime = time.time()
@@ -31,6 +34,7 @@ def distance(trigger,echo):
     # multiply with the sonic speed (34300 cm/s)
     # and divide by 2, because there and back
     distance = (TimeElapsed * 34300) / 2
+    print(distance)
 
     return distance
 
@@ -46,15 +50,16 @@ conn, addr = s.accept()
 print(f"Connected by {addr}")
 
 # Setting up sensors
-GPIO_TRIGGER_LIST = [22, 18, 17, 5, 25, 2]
-GPIO_ECHO_LIST = [27, 23, 4, 19, 8, 3]
+GPIO_TRIGGER_LIST = [18, 17]
+GPIO_ECHO_LIST = [23, 4]
 
 # Initializing distances
-dist_list = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+dist_list = [0.0, 0.0]
 
 while True:
     # Waiting for request
     data = conn.recv(1024)
+    print(data)
     if not data:
         break
 
@@ -68,7 +73,9 @@ while True:
         GPIO.setup(echo, GPIO.IN)
 
         dist_list[k] = round(distance(trigger,echo),1)
+        print(dist_list)
 
     # Sending response
     res = " ".join([str(d) for d in dist_list])
+    print(res)
     conn.sendall(bytearray(res,'utf8'))

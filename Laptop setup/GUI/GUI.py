@@ -33,26 +33,33 @@ global process_complete
 # Helper function for getting disntance measurements from sensor
 def getDistances(s, offsets):
     # Number of queries of sensor measurements
-    N = 3
+    N = 2
 
-    dist_list = np.zeros((N, 6))
-    dist_raw = np.zeros((N, 6))
+    dist_list = np.zeros((N, 2))
+    dist_raw = np.zeros((N, 2))
 
     for k in range(0, N):
+        print(k)
         # Sending a request for data and receiving it
         s.sendall(b" ")
+        print("sent")
         data = s.recv(1024)
+        print("received")
         time.sleep(0.25)
+        print("done sleeping")
 
         # Parsing the measurements
         for i, item in enumerate(data.split()):
             dist_raw[k, i] = float(item)
             dist_list[k, i] = float(item) - offsets[i % 3]
+        print("parsed")
     # print(dist_raw)
     # print(dist_list)
     dist_list = np.median(dist_list, 0)
+    print(dist_list)
 
     return dist_list
+    # return []
 
 
 # Helper function for computing orientation of robot
@@ -68,6 +75,8 @@ def findOrientation(Dist, lenRobot):
     theta=np.arctan2((Dist[0]-Dist[1]), lenRobot)*180/np.pi
     return theta
 
+    # return 0.5
+
 ############################ End Ultrasonic sensors and laptop-pi communication functions #############################
 
 ########################################## Establish connection with pi #############################################
@@ -78,7 +87,7 @@ ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 ssh.connect(HOST, username='pi', password='raspberry')
 ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command('python /home/pi/ultrasonic_calibration/RPI_ServerSensors.py &')
-time.sleep(2)
+time.sleep(5)
 
 
 ## CONNECTING TO RPI SERVER
@@ -254,7 +263,17 @@ class Page3(QWidget):
     def __init__(self):
         super().__init__()
         
-        self.mm = MachineMotion(DEFAULT_IP_ADDRESS.usb_windows)
+        # Initialize the machine motion object
+        self.mm = MachineMotion(DEFAULT_IP)
+        print('mm initialized')
+
+        # Remove the software stop
+        print("--> Removing software stop")
+        self.mm.releaseEstop()
+        print("--> Resetting system")
+        self.mm.resetSystem()
+        print("successfully created mm object")
+                
         self.camMotor = 1
 
         self.l1 = QLabel("Image Acquisition Process Started")
@@ -281,10 +300,12 @@ class Page3(QWidget):
         threading.Thread(target=self.acquisition_process).start()
     
     def acquisition_process(self):
+        print("entered acquisition")
         global stop_exec
         stop_exec = False
         global process_complete
         process_complete = False
+
         self.mm.configAxis(self.camMotor, MICRO_STEPS.ustep_8, MECH_GAIN.ballscrew_10mm_turn)
         self.mm.configAxisDirection(self.camMotor, DIRECTION.POSITIVE)
 
@@ -302,11 +323,13 @@ class Page3(QWidget):
         i = 0
         pots = [None] * colvalues.size
         for num in colvalues:
+            print(pots[i])
+            print(num)
             pots[i] = num[0]
             i = i+1
         
-        self.mm.releaseEstop()
-        self.mm.resetSystem()
+        # self.mm.releaseEstop()
+        # self.mm.resetSystem()
 
         # Create new directory where today's images will be saved.
         dirName=f'{state}_{date.today()}'
@@ -318,8 +341,12 @@ class Page3(QWidget):
             os.chdir(f'{os.getcwd()}\{dirName}')
             
         row = 1
+        print("starting for loop")
+        print(pots)
         for j in pots:
+            print(j)
             if j==0:
+                print("j = 0")
                 if stop_exec:
                     break
                 dist_corrected = getDistances(s, offsets)
@@ -327,6 +354,8 @@ class Page3(QWidget):
                 # Getting angle
                 ang = findOrientation(dist_corrected, lenRobot)
                 print('debug_angle=', ang)
+
+                # ang = 0.5
 
                 #Calculate how much distance motor needs to move to align platform
                 d_correction_mm = 2*np.pi*widRobot*(abs(ang)/360)*10
@@ -345,10 +374,14 @@ class Page3(QWidget):
                 row += 1
                 continue
             else:
+                print("j not 0")
                 dist_corrected = getDistances(s, offsets)
+                print("finished getDistances")
 
                 # Getting angle
                 ang = findOrientation(dist_corrected, lenRobot)
+                # ang = 0.5
+                print("finished findOrientation")
                 print('debug_angle=', ang)
 
                 #Calculate how much distance motor needs to move to align platform
@@ -362,8 +395,12 @@ class Page3(QWidget):
                 elif ang < -0.5:
                     self.mm.moveRelative(wheelMotors[1], d_correction_mm)
                     self.mm.waitForMotionCompletion()
-                    
-                c = int(1000/(j-1)) #total distance between home and end sensor
+                
+                if j == 1:
+                    c = int(1000/(j)) #total distance between home and end sensor
+                else:
+                    c = int(1000/(j-1)) #total distance between home and end sensor
+
                 for i in range(1,j):
                     if stop_exec:
                         break
