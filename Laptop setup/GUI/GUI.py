@@ -1,15 +1,3 @@
-# Before getting started, some things that you may need to change on the script
-# line 25 change your state to 'MD', 'NC' or 'TX'
-# Function def filerename(pot), change if fname.startswith('MDX'):, ('MDX') to 'NCX' ot 'TXX' 
-
-state = 'NC' # for now change this to have files renamed with the state you are in
-lenRobot = 133  # Length of the robot (between front and back sensors) measured in cm
-widRobot =218 # Width of the robot (distance between two front wheels) in cm
-pi_username = 'pi' # if you haven't changed your pi's name the default username is 'pi'
-pi_password = 'raspberry' # if you haven't changed your pi's password, the default is 'raspberrypi'
-distTravel = 300
-wheelMotors = [2, 3] # if BB moving backwards change the motors order to [3,2]
-
 import os, sys, time, pandas as pd, openpyxl, threading
 sys.path.append("..")
 from MachineMotion import *
@@ -20,62 +8,79 @@ import paramiko
 import socket
 import numpy as np
 from datetime import date
+import select
+import json
+
+# Before getting started, some things that you may need to change on the script
+# line 25 change your STATE to 'MD', 'NC' or 'TX'
+# Function def file_rename(pot), change if fname.startswith('MDX'):, ('MDX') to 'NCX' ot 'TXX' 
+
+STATE = 'NC' # for now change this to have files renamed with the STATE you are in
+ROBOT_LENGTH = 133  # Length of the robot (between front and back sensors) measured in cm
+ROBOT_WIDTH =218 # Width of the robot (distance between two front wheels) in cm
+PI_USERNAME = 'pi' # if you haven't changed your pi's name the default username is 'pi'
+PI_PASSWORD = 'raspberry' # if you haven't changed your pi's password, the default is 'raspberrypi'
+DISTANCE_TRAVELED = 300
+WHEEL_MOTORS = [2, 3] # if BB moving backwards change the motors order to [3,2]
+NUMBER_OF_SENSORS = 2
+GPIO_TRIGGER_LIST = [18, 17]
+ULTRASONIC_SENSOR_LISTS = json.dumps({
+    "triggers": [18, 17],
+    "echoes": [23, 4],
+})
+DIRECTIONS = ["positive","negative"]
+
+
 
 HOST = "192.168.7.3"  # The server's hostname or IP address
 PORT = 65432  # The port used by the server
 
-global stop_exec
-global process_complete
-#global state
+global STOP_EXEC
+global PROCESS_COMPLETE
+#global STATE
 
 ############################### Ultrasonic sensors and laptop-pi communication functions ###############################
 
 # Helper function for getting disntance measurements from sensor
-def getDistances(s, offsets):
-    # Number of queries of sensor measurements
-    N = 2
+def get_distances(s, offsets):
+    dist_list = np.zeros((NUMBER_OF_SENSORS, NUMBER_OF_SENSORS))
+    dist_raw = np.zeros((NUMBER_OF_SENSORS, NUMBER_OF_SENSORS))
 
-    dist_list = np.zeros((N, 2))
-    dist_raw = np.zeros((N, 2))
-
-    for k in range(0, N):
-        print(k)
+    for k in range(0, NUMBER_OF_SENSORS):
         # Sending a request for data and receiving it
-        s.sendall(b" ")
-        print("sent")
+        s.sendall(bytes(ULTRASONIC_SENSOR_LISTS,encoding="utf-8"))
         data = s.recv(1024)
-        print("received")
+
+        # use timeout of 10 seconds to wait for sensor response
+        ready = select.select([s], [], [], 10)
+        if ready[0]:
+            data = s.recv(4096)
+        else:
+            print("sensor error!")
+
         time.sleep(0.25)
-        print("done sleeping")
 
         # Parsing the measurements
         for i, item in enumerate(data.split()):
             dist_raw[k, i] = float(item)
             dist_list[k, i] = float(item) - offsets[i % 3]
-        print("parsed")
-    # print(dist_raw)
-    # print(dist_list)
+
     dist_list = np.median(dist_list, 0)
-    print(dist_list)
 
     return dist_list
-    # return []
 
 
 # Helper function for computing orientation of robot
-def findOrientation(Dist, lenRobot):
+def find_orientation(Dist, ROBOT_LENGTH):
     '''
     :param Dist: np array. Average of N distances measured by the ultrasonic sensors. Array[0]=
     front right sensor, Array[1]= back right sensor.
-    :param lenRobot: distance in cm from front right to back right sensor
+    :param ROBOT_LENGTH: distance in cm from front right to back right sensor
     :return: angle of drift from straight trajectory
     '''
-    print('Dist[0]=', Dist[0])
-    print('Dist[1]=', Dist[1])
-    theta=np.arctan2((Dist[0]-Dist[1]), lenRobot)*180/np.pi
+    theta=np.arctan2((Dist[0]-Dist[1]), ROBOT_LENGTH)*180/np.pi
     return theta
 
-    # return 0.5
 
 ############################ End Ultrasonic sensors and laptop-pi communication functions #############################
 
@@ -85,8 +90,8 @@ def findOrientation(Dist, lenRobot):
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect(HOST, username='pi', password='raspberry')
-ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command('python /home/pi/ultrasonic_calibration/RPI_ServerSensors.py &')
+ssh.connect(HOST, username=PI_USERNAME, password=PI_PASSWORD)
+ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command('python /home/{}/ultrasonic_calibration/RPI_ServerSensors.py &'.format(PI_USERNAME))
 time.sleep(5)
 
 
@@ -95,6 +100,7 @@ time.sleep(5)
 # Setting up the connection
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((HOST, PORT))
+s.setblocking(0)
 
 
 ## LOADING OFFSETS
@@ -152,17 +158,17 @@ class Page1(QWidget):
         self.total_species = QComboBox()
         self.species_list = [None]*10
         self.row_list = [None]*10
-        for i in range(1,10):
+        for i in range(1, 10):
             self.total_species.addItem(str(i))
             self.species_list[i-1] = QLineEdit()
             self.row_list[i-1] = QLineEdit()
-        self.total_species.currentIndexChanged.connect(self.updateList)
+        self.total_species.currentIndexChanged.connect(self.update_list)
         self.earlier_cnt = 1
         
         self.l1 = QLabel("Name of Species")
         self.l2 = QLabel("Row Numbers")
         self.btn1 = QPushButton('UPDATE', self)
-        self.btn1.clicked.connect(self.updateExcel)
+        self.btn1.clicked.connect(self.update_excel)
         self.btn1.setEnabled(False)
 
         self.layout = QGridLayout()
@@ -174,7 +180,7 @@ class Page1(QWidget):
         self.setGeometry(100, 100, 600, 500)
         self.setWindowTitle('BenchBot')
 
-    def updateList(self):
+    def update_list(self):
         count = int(self.total_species.currentText())
         self.layout.addWidget(self.l1, 1, 2)
         self.layout.addWidget(self.l2, 1, 3)
@@ -191,7 +197,7 @@ class Page1(QWidget):
         self.earlier_cnt = count
         # issues with too much variance
 
-    def updateExcel(self):
+    def update_excel(self):
         count = int(self.total_species.currentText())
         wb = openpyxl.load_workbook('SpeciesSheet.xlsx')
         sheet = wb.active
@@ -214,7 +220,7 @@ class Page2(QWidget):
         l1 = QLabel("Species")
         l2 = QLabel("Number of Images to Capture")
         btn = QPushButton('NEXT', self)
-        btn.clicked.connect(self.confirmmsg)
+        btn.clicked.connect(self.confirm_message)
         
         self.layout = QGridLayout()
         self.layout.addWidget(QLabel("            "), 0, 0)
@@ -236,7 +242,7 @@ class Page2(QWidget):
         self.setGeometry(100, 100, 600, 500)
         self.setWindowTitle('BenchBot')
 
-    def confirmmsg(self):
+    def confirm_message(self):
         dlg = QMessageBox(self)
         dlg.setWindowTitle("Confirm")
         dlg.setText("Are you sure you want to begin the image acquisition process?")
@@ -301,19 +307,18 @@ class Page3(QWidget):
     
     def acquisition_process(self):
         print("entered acquisition")
-        global stop_exec
-        stop_exec = False
-        global process_complete
-        process_complete = False
+        global STOP_EXEC
+        STOP_EXEC = False
+        global PROCESS_COMPLETE
+        PROCESS_COMPLETE = False
 
         self.mm.configAxis(self.camMotor, MICRO_STEPS.ustep_8, MECH_GAIN.ballscrew_10mm_turn)
         self.mm.configAxisDirection(self.camMotor, DIRECTION.POSITIVE)
 
-        #wheelMotors = [2,3]
-        directions = ["negative","positive"]
-        for axis in wheelMotors:
+        # DIRECTIONS = ["negative","positive"]
+        for axis in WHEEL_MOTORS:
             self.mm.configAxis(axis, MICRO_STEPS.ustep_8, MECH_GAIN.enclosed_timing_belt_mm_turn)
-            self.mm.configAxisDirection(axis, directions[axis-2])
+            self.mm.configAxisDirection(axis, DIRECTIONS[axis-2])
         self.mm.emitAcceleration(50)
         self.mm.emitSpeed(80)
         path = os.getcwd()+'\\RemoteCli\\RemoteCli.exe'
@@ -332,7 +337,7 @@ class Page3(QWidget):
         # self.mm.resetSystem()
 
         # Create new directory where today's images will be saved.
-        dirName=f'{state}_{date.today()}'
+        dirName=f'{STATE}_{date.today()}'
         if dirName in os.listdir():
             os.chdir(f'{os.getcwd()}\{dirName}')
             print('Folder already created')
@@ -347,53 +352,53 @@ class Page3(QWidget):
             print(j)
             if j==0:
                 print("j = 0")
-                if stop_exec:
+                if STOP_EXEC:
                     break
-                dist_corrected = getDistances(s, offsets)
+                dist_corrected = get_distances(s, offsets)
 
                 # Getting angle
-                ang = findOrientation(dist_corrected, lenRobot)
+                ang = find_orientation(dist_corrected, ROBOT_LENGTH)
                 print('debug_angle=', ang)
 
                 # ang = 0.5
 
                 #Calculate how much distance motor needs to move to align platform
-                d_correction_mm = 2*np.pi*widRobot*(abs(ang)/360)*10
+                d_correction_mm = 2*np.pi*ROBOT_WIDTH*(abs(ang)/360)*10
                 print('debug_d_correction_mm=', d_correction_mm)
                 #Create if statement to indicate which motor moves
 
                 if ang > 0.5:
-                    self.mm.moveRelative(wheelMotors[0], d_correction_mm)
+                    self.mm.moveRelative(WHEEL_MOTORS[0], d_correction_mm)
                     self.mm.waitForMotionCompletion()
                 elif ang < -0.5:
-                    self.mm.moveRelative(wheelMotors[1], d_correction_mm)
+                    self.mm.moveRelative(WHEEL_MOTORS[1], d_correction_mm)
                     self.mm.waitForMotionCompletion()
 
-                self.mm.moveRelativeCombined(wheelMotors, [distTravel, distTravel])
+                self.mm.moveRelativeCombined(WHEEL_MOTORS, [DISTANCE_TRAVELED, DISTANCE_TRAVELED])
                 self.mm.waitForMotionCompletion()
                 row += 1
                 continue
             else:
                 print("j not 0")
-                dist_corrected = getDistances(s, offsets)
-                print("finished getDistances")
+                dist_corrected = get_distances(s, offsets)
+                print("finished get_distances")
 
                 # Getting angle
-                ang = findOrientation(dist_corrected, lenRobot)
+                ang = find_orientation(dist_corrected, ROBOT_LENGTH)
                 # ang = 0.5
-                print("finished findOrientation")
+                print("finished find_orientation")
                 print('debug_angle=', ang)
 
                 #Calculate how much distance motor needs to move to align platform
-                d_correction_mm = 2*np.pi*widRobot*(abs(ang)/360)*10
+                d_correction_mm = 2*np.pi*ROBOT_WIDTH*(abs(ang)/360)*10
                 print('debug_d_correction_mm=', d_correction_mm)
                 #Create if statement to indicate which motor moves
 
                 if ang > 0.5:
-                    self.mm.moveRelative(wheelMotors[0], d_correction_mm)
+                    self.mm.moveRelative(WHEEL_MOTORS[0], d_correction_mm)
                     self.mm.waitForMotionCompletion()
                 elif ang < -0.5:
-                    self.mm.moveRelative(wheelMotors[1], d_correction_mm)
+                    self.mm.moveRelative(WHEEL_MOTORS[1], d_correction_mm)
                     self.mm.waitForMotionCompletion()
                 
                 if j == 1:
@@ -402,33 +407,33 @@ class Page3(QWidget):
                     c = int(1000/(j-1)) #total distance between home and end sensor
 
                 for i in range(1,j):
-                    if stop_exec:
+                    if STOP_EXEC:
                         break
                     #Trigger capture of image
                     os.startfile(path)
                     time.sleep(15)
-                    threading.Thread(target=filerename(row)).start()
+                    threading.Thread(target=file_rename(row)).start()
                     #Move camera plate to next point
                     self.mm.moveRelative(self.camMotor, c)
                     self.mm.waitForMotionCompletion()
-                if stop_exec:
+                if STOP_EXEC:
                     break
                 #Trigger image capture at last point
                 os.startfile(path)
                 time.sleep(15)
-                threading.Thread(target=filerename(row)).start()
+                threading.Thread(target=file_rename(row)).start()
                 #move camera plate to start location
                 self.mm.moveToHome(self.camMotor)
                 self.mm.waitForMotionCompletion()
 
-                self.mm.moveRelativeCombined(wheelMotors, [distTravel, distTravel])
+                self.mm.moveRelativeCombined(WHEEL_MOTORS, [DISTANCE_TRAVELED, DISTANCE_TRAVELED])
                 self.mm.waitForMotionCompletion()
                 row += 1
 
-        if stop_exec:
-            self.stop
+        if STOP_EXEC:
+            self.stop()
         else:
-            process_complete = True
+            PROCESS_COMPLETE = True
             self.mm.triggerEstop()
             self.l1.setText('Acquisition Process Complete')
             current_time = time.time()
@@ -442,20 +447,20 @@ class Page3(QWidget):
         stopping.start()
         
     def stop(self):
-        global stop_exec
-        global process_complete
-        stop_exec = True
+        global STOP_EXEC
+        global PROCESS_COMPLETE
+        STOP_EXEC = True
         self.mm.moveToHome(self.camMotor)
         self.mm.waitForMotionCompletion()
         self.mm.triggerEstop()
-        if not process_complete:
+        if not PROCESS_COMPLETE:
             self.l1.setText('Acquisition Process Disrupted')
             self.l2.setText('     Close the Application')
 
     def update_label(self):
-        global process_complete
-        global stop_exec
-        if process_complete or stop_exec:
+        global PROCESS_COMPLETE
+        global STOP_EXEC
+        if PROCESS_COMPLETE or STOP_EXEC:
             self.timer.stop()
         else:
             current_time = time.time()
@@ -465,17 +470,17 @@ class Page3(QWidget):
             self.l2.setText('     Time Elapsed: '+str(elapsed_hr)+ ' hrs '+str(elapsed_min)+ ' mins')
 
 
-def filerename(pot):
-    global state
+def file_rename(pot):
+    global STATE
     #time.sleep(2)
     time.sleep(3) #changed to 10 to test since file renaming not working
     t = str(int(time.time()))
     for fname in os.listdir('.'):
         if fname.startswith('NCX'):
             if fname.endswith('.JPG'):
-                dst = f"{state}_Row-{str(pot)}_{t}.JPG" 
+                dst = f"{STATE}_Row-{str(pot)}_{t}.JPG" 
             elif fname.endswith('.ARW'):
-                dst = f"{state}_Row-{str(pot)}_{t}.ARW"
+                dst = f"{STATE}_Row-{str(pot)}_{t}.ARW"
         else:
             continue
         os.rename(f"{fname}", f"{dst}")
