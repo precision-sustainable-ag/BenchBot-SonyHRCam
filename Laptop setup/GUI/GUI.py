@@ -79,21 +79,21 @@ def findOrientation(Dist, lenRobot):
 
 ## INITIALIZING SERVER IN RPI
 
-# ssh = paramiko.SSHClient()
-# ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-# ssh.connect(HOST, username=pi_username, password=pi_password)
-# ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command('python /home/benchbot/ultrasonic_calibration/RPI_ServerSensors.py &')
-# time.sleep(2)
+ssh = paramiko.SSHClient()
+ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+ssh.connect(HOST, username=pi_username, password=pi_password)
+ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command('python /home/benchbot/ultrasonic_calibration/RPI_ServerSensors.py &')
+time.sleep(2)
 
 
-# ## CONNECTING TO RPI SERVER
+## CONNECTING TO RPI SERVER
 
-# # Setting up the connection
-# s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-# s.connect((HOST, PORT))
+# Setting up the connection
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect((HOST, PORT))
 
 
-# ## LOADING OFFSETS
+## LOADING OFFSETS
 offsets = np.loadtxt('SensorOffsets.csv', delimiter=',', skiprows = 1)# delimiter added
 
 print(offsets)
