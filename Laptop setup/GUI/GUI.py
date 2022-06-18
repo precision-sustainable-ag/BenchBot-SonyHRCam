@@ -12,10 +12,15 @@ wheelMotors = [2, 3] # if BB moving backwards change the motors order to [3,2]
 
 import os, sys, time, pandas as pd, openpyxl, threading
 sys.path.append("..")
+
 from MachineMotion import *
-from PyQt6 import QtWidgets
-from PyQt6.QtCore import QTimer
-from PyQt6.QtWidgets import *
+
+from PyQt5 import QtWidgets
+
+from PyQt5.QtCore import QTimer
+
+from PyQt5.QtWidgets import *
+
 import paramiko
 import socket
 import numpy as np
@@ -74,21 +79,21 @@ def findOrientation(Dist, lenRobot):
 
 ## INITIALIZING SERVER IN RPI
 
-ssh = paramiko.SSHClient()
-ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect(HOST, username=pi_username, password=pi_password)
-ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command('python /home/benchbot/ultrasonic_calibration/RPI_ServerSensors.py &')
-time.sleep(2)
+# ssh = paramiko.SSHClient()
+# ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+# ssh.connect(HOST, username=pi_username, password=pi_password)
+# ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command('python /home/benchbot/ultrasonic_calibration/RPI_ServerSensors.py &')
+# time.sleep(2)
 
 
-## CONNECTING TO RPI SERVER
+# ## CONNECTING TO RPI SERVER
 
-# Setting up the connection
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect((HOST, PORT))
+# # Setting up the connection
+# s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+# s.connect((HOST, PORT))
 
 
-## LOADING OFFSETS
+# ## LOADING OFFSETS
 offsets = np.loadtxt('SensorOffsets.csv', delimiter=',', skiprows = 1)# delimiter added
 
 print(offsets)
