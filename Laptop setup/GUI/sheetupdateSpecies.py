@@ -19,6 +19,12 @@ for num in species:
 wb = openpyxl.load_workbook('ImagesSheet.xlsx')
 sheet = wb.active
  
+# scrub the sheet for new incoming data
+sheet.delete_cols(1, 2)
+sheet["A1"] = "SpeciesName"
+sheet["B1"] = "ImagesCount"
+
+# add new data to the sheet
 s = 0
 for rownums in rarr:
    arr1 = rownums.split(',')
@@ -35,5 +41,5 @@ for rownums in rarr:
        nam = str(species[s])[2:-2]
        sheet.cell(row = val+1, column = 1).value = nam
    s+= 1
- 
+    
 wb.save('ImagesSheet.xlsx')
