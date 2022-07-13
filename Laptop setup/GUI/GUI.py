@@ -71,7 +71,6 @@ def findOrientation(Dist, lenRobot):
     print('Dist[1]=', Dist[1])
     theta=np.arctan2((Dist[0]-Dist[1]), lenRobot)*180/np.pi
     return theta
-
     # return 0.5
 
 ############################ End Ultrasonic sensors and laptop-pi communication functions #############################
@@ -405,9 +404,9 @@ class Page3(QWidget):
             os.mkdir(f'{os.getcwd()}\{dirName}')
         os.chdir(f'{os.getcwd()}\{dirName}')
             
-        row = 1
+        direction = True
         print("starting for loop")
-        print(pots)
+        
         for j in pots:
             print(j)
             if j==0:
@@ -436,7 +435,6 @@ class Page3(QWidget):
 
                 self.mm.moveRelativeCombined(wheelMotors, [distTravel, distTravel])
                 self.mm.waitForMotionCompletion()
-                row += 1
                 continue
             else:
                 print("j not 0")
@@ -462,9 +460,16 @@ class Page3(QWidget):
                     self.mm.waitForMotionCompletion()
                 
                 if j == 1:
-                    c = int(1000/(j)) #total distance between home and end sensor
+                    ct = int(1000/(j)) #total distance between home and end sensor
                 else:
-                    c = int(1000/(j-1)) #total distance between home and end sensor
+                    ct = int(1000/(j-1)) #total distance between home and end sensor
+                    
+                if direction:
+                    c = ct
+                    direction = False
+                else:
+                    c = -ct
+                    direction = True
 
                 for i in range(1,j):
                     if stop_exec:
@@ -472,7 +477,7 @@ class Page3(QWidget):
                     #Trigger capture of image
                     os.startfile(path)
                     time.sleep(15)
-                    threading.Thread(target=filerename(row)).start()
+                    threading.Thread(target=filerename()).start()
                     #Move camera plate to next point
                     self.mm.moveRelative(self.camMotor, c)
                     self.mm.waitForMotionCompletion()
@@ -481,14 +486,10 @@ class Page3(QWidget):
                 #Trigger image capture at last point
                 os.startfile(path)
                 time.sleep(15)
-                threading.Thread(target=filerename(row)).start()
-                #move camera plate to start location
-                self.mm.moveToHome(self.camMotor)
-                self.mm.waitForMotionCompletion()
-
+                threading.Thread(target=filerename()).start()
+                
                 self.mm.moveRelativeCombined(wheelMotors, [distTravel, distTravel])
                 self.mm.waitForMotionCompletion()
-                row += 1
 
         if stop_exec:
             self.stop
@@ -529,17 +530,16 @@ class Page3(QWidget):
             elapsed_min = int(elapsed_time/60) - 60*elapsed_hr
             self.l2.setText('     Time Elapsed: '+str(elapsed_hr)+ ' hrs '+str(elapsed_min)+ ' mins')
 
-
-def filerename(pot):
+def filerename():
     global state
     time.sleep(3)
     t = str(int(time.time()))
     for fname in os.listdir('.'):
         if fname.startswith('NCX'):
             if fname.endswith('.JPG'):
-                dst = f"{state}_Row-{str(pot)}_{t}.JPG" 
+                dst = f"{state}_{t}.JPG" 
             elif fname.endswith('.ARW'):
-                dst = f"{state}_Row-{str(pot)}_{t}.ARW"
+                dst = f"{state}_{t}.ARW"
         else:
             continue
         os.rename(f"{fname}", f"{dst}")
