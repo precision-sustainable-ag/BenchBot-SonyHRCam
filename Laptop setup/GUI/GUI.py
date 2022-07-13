@@ -115,7 +115,7 @@ class mainWindow(QWidget):
         qbtn.clicked.connect(QApplication.instance().quit)
         qbtn.resize(qbtn.sizeHint())
         qbtn.move(330, 260)
-		l3 = QLabel('State')
+	l3 = QLabel('State')
         self.statebox = QComboBox()
         self.statebox.addItem('NC')
         self.statebox.addItem('TX')
@@ -140,12 +140,12 @@ class mainWindow(QWidget):
         self.show()
 
     def optyes(self):
-		global state
+	global state
         state = self.statebox.currentText()
         mwin.setCurrentIndex(mwin.currentIndex()+1)
     
     def optno(self):
-		global state
+	global state
         state = self.statebox.currentText()
         page2 = Page2()
         mwin.addWidget(page2)
@@ -181,7 +181,7 @@ class Page1(QWidget):
         self.setGeometry(100, 100, 600, 500)
         self.setWindowTitle('BenchBot')
 		
-		self.onlyInt = QIntValidator(0,8,self)
+	self.onlyInt = QIntValidator(0,8,self)
 
     def updateList(self):
         count = int(self.total_species.currentText())
@@ -199,7 +199,7 @@ class Page1(QWidget):
         self.btn1.setEnabled(True)
         self.earlier_cnt = count
 		
-	def checkCells(self):
+    def checkCells(self):
         ## logic for checking contents of the fields before proceeding
         err_code = 0
         count = int(self.total_species.currentText())
@@ -291,7 +291,7 @@ class Page2(QWidget):
         for sname in species_names:
             self.layout.addWidget(QLabel(sname[0]), i+2, 1)
             self.snaps[i] = QLineEdit()
-			self.snaps[i].setValidator(self.onlyInt)
+	    self.snaps[i].setValidator(self.onlyInt)
             self.layout.addWidget(self.snaps[i], i+2, 2)
             i += 1
 
@@ -299,7 +299,7 @@ class Page2(QWidget):
         self.setGeometry(100, 100, 600, 500)
         self.setWindowTitle('BenchBot')
 		
-	def checkContent(self):
+    def checkContent(self):
         err_code = 0
         for c in range(0,len(self.snaps)):
             input_text = self.snaps[c].text()
@@ -392,7 +392,7 @@ class Page3(QWidget):
         self.mm.emitSpeed(80)
         path = os.getcwd()+'\\RemoteCli\\RemoteCli.exe'
         	
-		df  = pd.read_excel('ImagesSheet.xlsx')
+	df  = pd.read_excel('ImagesSheet.xlsx')
         colvalues = df[['ImagesCount']].values
         pots = []
         for num in colvalues:
