@@ -437,7 +437,7 @@ class Page3(QWidget):
                     self.mm.moveRelative(wheelMotors[0], d_correction_mm)
                     self.mm.waitForMotionCompletion()
                 
-                ct = int(800/(j-1))
+                ct = int(1000/(j-1))
                     
                 if direction:
                     c = ct
