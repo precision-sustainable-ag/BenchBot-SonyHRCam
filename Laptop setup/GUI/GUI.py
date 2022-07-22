@@ -1,12 +1,9 @@
-# Before getting started, some things that you may need to change on the script
-# Function def filerename(pot), change if fname.startswith('MDX'):, ('MDX') to 'NCX' ot 'TXX' 
-
-lenRobot = 133  # Length of the robot (between front and back sensors) measured in cm
-widRobot = 218 # Width of the robot (distance between two front wheels) in cm
+lenRobot = 135  # Length of the robot (between front and back sensors) measured in cm
+widRobot = 215 # Width of the robot (distance between two front wheels) in cm
 pi_username = 'pi' # if you haven't changed your pi's name the default username is 'pi'
 pi_password = 'raspberry' # if you haven't changed your pi's password, the default is 'raspberrypi'
-distTravel = 300
-wheelMotors = [2, 3] # if BB moving backwards change the motors order to [3,2]
+distTravel = 520
+wheelMotors = [3,2] # if BB moving backwards change the motors order to [3,2]
 
 import os, sys, time, pandas as pd, openpyxl, threading
 import string, shutil, datetime, paramiko, socket, numpy as np
@@ -18,12 +15,10 @@ from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import *
 from PyQt6.QtGui import QIntValidator
 
+global stop_exec, process_complete, state
+
 HOST = "192.168.7.3"  # The server's hostname or IP address
 PORT = 65432  # The port used by the server
-
-global stop_exec
-global process_complete
-global state
 
 ############################### Ultrasonic sensors and laptop-pi communication functions ###############################
 
@@ -36,28 +31,19 @@ def getDistances(s, offsets):
     dist_raw = np.zeros((N, 2))
 
     for k in range(0, N):
-        print(k)
         # Sending a request for data and receiving it
         s.sendall(b" ")
-        print("sent")
         data = s.recv(1024)
-        print("received")
         time.sleep(0.25)
-        print("done sleeping")
 
         # Parsing the measurements
         for i, item in enumerate(data.split()):
             dist_raw[k, i] = float(item)
             dist_list[k, i] = float(item) - offsets[i % 3]
-        print("parsed")
     # print(dist_raw)
     # print(dist_list)
     dist_list = np.median(dist_list, 0)
-    print(dist_list)
-
     return dist_list
-    # return []
-
 
 # Helper function for computing orientation of robot
 def findOrientation(Dist, lenRobot):
@@ -71,7 +57,6 @@ def findOrientation(Dist, lenRobot):
     print('Dist[1]=', Dist[1])
     theta=np.arctan2((Dist[0]-Dist[1]), lenRobot)*180/np.pi
     return theta
-    # return 0.5
 
 ############################ End Ultrasonic sensors and laptop-pi communication functions #############################
 
@@ -81,9 +66,9 @@ def findOrientation(Dist, lenRobot):
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect(HOST, username='pi', password='raspberry')
+ssh.connect(HOST, username=pi_username, password=pi_password)
 ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command('python /home/pi/ultrasonic_calibration/RPI_ServerSensors.py &')
-time.sleep(5)
+time.sleep(2)
 
 
 ## CONNECTING TO RPI SERVER
@@ -95,7 +80,6 @@ s.connect((HOST, PORT))
 
 ## LOADING OFFSETS
 offsets = np.loadtxt('SensorOffsets.csv', delimiter=',', skiprows = 1)# delimiter added
-
 print(offsets)
 
 ########################################## End Establish connection with pi ###########################################
@@ -106,20 +90,20 @@ class mainWindow(QWidget):
         
         l1 = QLabel("WELCOME!")
         l2 = QLabel("Do you want to make changes to the species list?")
-        btnyes = QPushButton('YES', self)
-        btnyes.clicked.connect(self.optyes)
-        btnno = QPushButton('NO', self)
-        btnno.clicked.connect(self.optno)
-
-        qbtn = QPushButton('Quit')
-        qbtn.clicked.connect(QApplication.instance().quit)
-        qbtn.resize(qbtn.sizeHint())
-        qbtn.move(330, 260)
-	l3 = QLabel('State')
+        l3 = QLabel('State')
         self.statebox = QComboBox()
         self.statebox.addItem('NC')
         self.statebox.addItem('TX')
         self.statebox.addItem('MD')
+        
+        btnyes = QPushButton('YES', self)
+        btnyes.clicked.connect(self.optyes)
+        btnno = QPushButton('NO', self)
+        btnno.clicked.connect(self.optno)
+        qbtn = QPushButton('Quit')
+        qbtn.clicked.connect(QApplication.instance().quit)
+        qbtn.resize(qbtn.sizeHint())
+        qbtn.move(330, 260)
         
         grid = QGridLayout()
         grid.setSpacing(10)
@@ -140,18 +124,20 @@ class mainWindow(QWidget):
         self.show()
 
     def optyes(self):
-	global state
+        global state
         state = self.statebox.currentText()
+        page = speciesPage()
+        mwin.addWidget(page)
         mwin.setCurrentIndex(mwin.currentIndex()+1)
     
     def optno(self):
-	global state
+        global state
         state = self.statebox.currentText()
-        page2 = Page2()
-        mwin.addWidget(page2)
-        mwin.setCurrentIndex(mwin.currentIndex()+2)
+        page = imagesPage()
+        mwin.addWidget(page)
+        mwin.setCurrentIndex(mwin.currentIndex()+1)
 
-class Page1(QWidget):
+class speciesPage(QWidget):
     def __init__(self):
         super().__init__()
 
@@ -180,8 +166,6 @@ class Page1(QWidget):
         self.setLayout(self.layout)
         self.setGeometry(100, 100, 600, 500)
         self.setWindowTitle('BenchBot')
-		
-	self.onlyInt = QIntValidator(0,8,self)
 
     def updateList(self):
         count = int(self.total_species.currentText())
@@ -205,6 +189,7 @@ class Page1(QWidget):
         count = int(self.total_species.currentText())
         allowed_chars1=['1','2','3','4','5','6','7','8','9','0',',','-']
         allowed_chars2=list(string.ascii_letters)
+        allowed_chars2.append(' ')
 
         for c in range(0,count):
             input_text1 = self.row_list[c].text()
@@ -245,12 +230,12 @@ class Page1(QWidget):
             sheet.cell(row = c+2, column = 2).value = ''
             sheet.cell(row = c+2, column = 3).value = ''
         wb.save('SpeciesSheet.xlsx')
-        os.system("python3 sheetupdateSpecies.py")
+        os.system("python sheetupdateSpecies.py")
         #time.sleep(0.1)
         threading.Thread(target=backupSheet).start()
         
-        page2 = Page2()
-        mwin.addWidget(page2)
+        page = imagesPage()
+        mwin.addWidget(page)
         mwin.setCurrentIndex(mwin.currentIndex()+1)
         
 def backupSheet():
@@ -268,7 +253,7 @@ def backupSheet():
     os.rename(r'new.xlsx',r'SpeciesSheet_' + state + str(today) + '.xlsx')
 
 
-class Page2(QWidget):
+class imagesPage(QWidget):
     def __init__(self):
         super().__init__()
 
@@ -291,7 +276,7 @@ class Page2(QWidget):
         for sname in species_names:
             self.layout.addWidget(QLabel(sname[0]), i+2, 1)
             self.snaps[i] = QLineEdit()
-	    self.snaps[i].setValidator(self.onlyInt)
+            self.snaps[i].setValidator(self.onlyInt)
             self.layout.addWidget(self.snaps[i], i+2, 2)
             i += 1
 
@@ -333,15 +318,15 @@ class Page2(QWidget):
                 sheet.cell(row = c+2, column = 3).value = self.snaps[c].text()
             wb.save('SpeciesSheet.xlsx')
             os.system("python sheetupdatePictures.py")
-            page3 = Page3()
-            mwin.addWidget(page3)
-            mwin.setCurrentIndex(mwin.currentIndex()+1)
             dlg.done(1)
+            page = acquisitionPage()
+            mwin.addWidget(page)
+            mwin.setCurrentIndex(mwin.currentIndex()+1)
         else:
             dlg.done(1)
 
 
-class Page3(QWidget):
+class acquisitionPage(QWidget):
     def __init__(self):
         super().__init__()
         
@@ -375,10 +360,8 @@ class Page3(QWidget):
         threading.Thread(target=self.acquisition_process).start()
     
     def acquisition_process(self):
-        print("entered acquisition")
-        global stop_exec
+        global stop_exec, process_complete
         stop_exec = False
-        global process_complete
         process_complete = False
 
         self.mm.configAxis(self.camMotor, MICRO_STEPS.ustep_8, MECH_GAIN.ballscrew_10mm_turn)
@@ -391,8 +374,8 @@ class Page3(QWidget):
         self.mm.emitAcceleration(50)
         self.mm.emitSpeed(80)
         path = os.getcwd()+'\\RemoteCli\\RemoteCli.exe'
-        	
-	df  = pd.read_excel('ImagesSheet.xlsx')
+
+        df  = pd.read_excel('ImagesSheet.xlsx')
         colvalues = df[['ImagesCount']].values
         pots = []
         for num in colvalues:
@@ -405,12 +388,9 @@ class Page3(QWidget):
         os.chdir(f'{os.getcwd()}\{dirName}')
             
         direction = True
-        print("starting for loop")
         
         for j in pots:
-            print(j)
-            if j==0:
-                print("j = 0")
+            if j==0 or j==1:
                 if stop_exec:
                     break
                 dist_corrected = getDistances(s, offsets)
@@ -418,8 +398,6 @@ class Page3(QWidget):
                 # Getting angle
                 ang = findOrientation(dist_corrected, lenRobot)
                 print('debug_angle=', ang)
-
-                # ang = 0.5
 
                 #Calculate how much distance motor needs to move to align platform
                 d_correction_mm = 2*np.pi*widRobot*(abs(ang)/360)*10
@@ -437,21 +415,17 @@ class Page3(QWidget):
                 self.mm.waitForMotionCompletion()
                 continue
             else:
-                print("j not 0")
                 dist_corrected = getDistances(s, offsets)
-                print("finished getDistances")
-
+                
                 # Getting angle
                 ang = findOrientation(dist_corrected, lenRobot)
-                # ang = 0.5
-                print("finished findOrientation")
                 print('debug_angle=', ang)
 
                 #Calculate how much distance motor needs to move to align platform
                 d_correction_mm = 2*np.pi*widRobot*(abs(ang)/360)*10
                 print('debug_d_correction_mm=', d_correction_mm)
+                
                 #Create if statement to indicate which motor moves
-
                 if ang > 0.5:
                     self.mm.moveRelative(wheelMotors[0], d_correction_mm)
                     self.mm.waitForMotionCompletion()
@@ -459,16 +433,12 @@ class Page3(QWidget):
                     self.mm.moveRelative(wheelMotors[1], d_correction_mm)
                     self.mm.waitForMotionCompletion()
                 
-                if j == 1:
-                    ct = int(1000/(j)) #total distance between home and end sensor
-                else:
-                    ct = int(1000/(j-1)) #total distance between home and end sensor
+                c = int(800/(j-1)) #total distance between home and end sensor
                     
                 if direction:
-                    c = ct
                     direction = False
                 else:
-                    c = -ct
+                    c = -c
                     direction = True
 
                 for i in range(1,j):
@@ -476,16 +446,16 @@ class Page3(QWidget):
                         break
                     #Trigger capture of image
                     os.startfile(path)
-                    time.sleep(15)
-                    threading.Thread(target=filerename()).start()
+                    time.sleep(8)
                     #Move camera plate to next point
                     self.mm.moveRelative(self.camMotor, c)
                     self.mm.waitForMotionCompletion()
+                    threading.Thread(target=filerename()).start()
                 if stop_exec:
                     break
                 #Trigger image capture at last point
                 os.startfile(path)
-                time.sleep(15)
+                time.sleep(8)
                 threading.Thread(target=filerename()).start()
                 
                 self.mm.moveRelativeCombined(wheelMotors, [distTravel, distTravel])
@@ -495,6 +465,8 @@ class Page3(QWidget):
             self.stop
         else:
             process_complete = True
+            self.mm.moveToHome(self.camMotor)
+            self.mm.waitForMotionCompletion()
             self.mm.triggerEstop()
             self.l1.setText('Acquisition Process Complete')
             current_time = time.time()
@@ -509,7 +481,6 @@ class Page3(QWidget):
         
     def stop(self):
         global stop_exec
-        global process_complete
         stop_exec = True
         self.mm.moveToHome(self.camMotor)
         self.mm.waitForMotionCompletion()
@@ -519,8 +490,6 @@ class Page3(QWidget):
             self.l2.setText('     Close the Application')
 
     def update_label(self):
-        global process_complete
-        global stop_exec
         if process_complete or stop_exec:
             self.timer.stop()
         else:
@@ -531,11 +500,10 @@ class Page3(QWidget):
             self.l2.setText('     Time Elapsed: '+str(elapsed_hr)+ ' hrs '+str(elapsed_min)+ ' mins')
 
 def filerename():
-    global state
-    time.sleep(3)
+    time.sleep(2)
     t = str(int(time.time()))
     for fname in os.listdir('.'):
-        if fname.startswith('NCX'):
+        if fname.startswith(state+'X'):
             if fname.endswith('.JPG'):
                 dst = f"{state}_{t}.JPG" 
             elif fname.endswith('.ARW'):
@@ -548,9 +516,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     mwin = QtWidgets.QStackedWidget()
     win = mainWindow()
-    page1 = Page1()
     mwin.addWidget(win)
-    mwin.addWidget(page1)
     mwin.setFixedHeight(400)
     mwin.setFixedWidth(500)
     mwin.show()
