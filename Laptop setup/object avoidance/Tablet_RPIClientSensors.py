@@ -15,29 +15,29 @@ robot_length = 133
 
 
 def find_orientation(distance, robot_length):
-    R1 = distance[0]
-    R2 = distance[1]
+    r1 = distance[0]
+    r2 = distance[1]
     fac = 1
 
     d = robot_length
 
-    if R1 == R2:
+    if r1 == r2:
         return 0
-    elif R1 > R2:
-        R1 = distance[1]
-        R2 = distance[0]
+    elif r1 > r2:
+        r1 = distance[1]
+        r2 = distance[0]
         fac = -1
 
-    a = d*R1/(R2-R1)
+    a = d*r1/(r2-r1)
 
-    tmp = a*R1/np.sqrt(np.power(a, 2)+np.power(R1, 2))
-    p1 = np.array([-R1*tmp/a, tmp])
+    tmp = a*r1/np.sqrt(np.power(a, 2)+np.power(r1, 2))
+    p1 = np.array([-r1*tmp/a, tmp])
 
-    tmp = (a+d)*R2/np.sqrt(np.power(a+d, 2)+np.power(R2, 2))
-    p2 = np.array([(a+d)*tmp/R2-np.sqrt(np.power(a, 2)+np.power(R1, 2)), tmp])
+    tmp = (a+d)*r2/np.sqrt(np.power(a+d, 2)+np.power(r2, 2))
+    p2 = np.array([(a+d)*tmp/r2-np.sqrt(np.power(a, 2)+np.power(r1, 2)), tmp])
 
-    C2 = np.sqrt(np.power(a+d, 2)+np.power(R2, 2)) - \
-        np.sqrt(np.power(a, 2)+np.power(R1, 2))
+    C2 = np.sqrt(np.power(a+d, 2)+np.power(r2, 2)) - \
+        np.sqrt(np.power(a, 2)+np.power(r1, 2))
 
     dp = p2-p1
     dp[1] = fac*dp[1]
@@ -89,6 +89,7 @@ for i in range(0, 10):
     # Getting angle
     angle_right = -find_orientation(dist_list[1:3], robot_length)
     angle_left = find_orientation(dist_list[4:6], robot_length)
-    print(np.round(angle_right*180/np.pi, 1), np.round(angle_left*180/np.pi, 1))
+    print(np.round(angle_right*180/np.pi, 1),
+          np.round(angle_left*180/np.pi, 1))
 
     time.sleep(1)
