@@ -3,6 +3,7 @@
 import socket
 import RPi.GPIO as GPIO
 import time
+import json
 
 # GPIO Mode (BOARD / BCM)
 GPIO.setmode(GPIO.BCM)
@@ -49,24 +50,25 @@ s.listen()
 conn, addr = s.accept()
 print(f"Connected by {addr}")
 
-# Setting up sensors
-GPIO_TRIGGER_LIST = [18, 17]
-GPIO_ECHO_LIST = [23, 4]
-
-# Initializing distances
-dist_list = [0.0, 0.0]
-
 while True:
     # Waiting for request
     data = conn.recv(1024)
-    print(data)
     if not data:
         break
 
+    json_data_recieved = json.loads(data)
+    gpio_trigger_list = json_data_recieved.get("trigger_pins")
+    gpio_echo_list = json_data_recieved.get("echo_pins")
+
+    if len(gpio_trigger_list) != len(gpio_echo_list):
+        conn.sendall(bytearray('Array size mismatch!','utf8'))
+
+    dist_list = [0.0] * len(gpio_echo_list)
+
     # Updating distances
-    for k in range(0,len(GPIO_TRIGGER_LIST)):
-        trigger = GPIO_TRIGGER_LIST[k]
-        echo = GPIO_ECHO_LIST[k]
+    for k in range(0,len(gpio_trigger_list)):
+        trigger = gpio_trigger_list[k]
+        echo = gpio_echo_list[k]
 
         # Set GPIO direction (IN / OUT)
         GPIO.setup(trigger, GPIO.OUT)
