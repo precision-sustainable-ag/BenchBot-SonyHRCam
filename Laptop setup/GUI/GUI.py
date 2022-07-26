@@ -101,16 +101,16 @@ def get_distances(s, offsets):
 # Helper function for computing orientation of robot
 
 
-def find_orientation(Dist):
+def find_orientation(distance):
     '''
-    :param Dist: np array. Average of N distances measured by the ultrasonic sensors. Array[0]=
+    :param distance: np array. Average of N distances measured by the ultrasonic sensors. Array[0]=
     front right sensor, Array[1]= back right sensor.
     :param ROBOT_LENGTH: distance in cm from front right to back right sensor
     :return: angle of drift from straight trajectory
     '''
-    print('Dist[0]=', Dist[0])
-    print('Dist[1]=', Dist[1])
-    theta = np.arctan2((Dist[0]-Dist[1]), ROBOT_LENGTH) * 180 / np.pi
+    print('distance[0]=', distance[0])
+    print('distance[1]=', distance[1])
+    theta = np.arctan2((distance[0]-distance[1]), ROBOT_LENGTH) * 180 / np.pi
     return theta
 
 ############################ End Ultrasonic sensors and laptop-pi communication functions #############################
@@ -423,9 +423,9 @@ class AcquisitionPage(QWidget):
         super().__init__()
 
         # Initialize the machine motion object
-        self.machine_motion = MachineMotion(DEFAULT_IP)
-        self.machine_motion.releaseEstop()
-        self.machine_motion.resetSystem()
+        self.mm = MachineMotion(DEFAULT_IP)
+        self.mm.releaseEstop()
+        self.mm.resetSystem()
         self.camera_motor = 1
 
         self.acquisition_label = QLabel("Image Acquisition Process Started")
@@ -453,18 +453,18 @@ class AcquisitionPage(QWidget):
 
     def configure_machine_motion(self):
         # config machine motion
-        self.machine_motion.configAxis(
+        self.mm.configAxis(
             self.camera_motor, MICRO_STEPS.ustep_8, MECH_GAIN.ballscrew_10mm_turn)
-        self.machine_motion.configAxisDirection(
+        self.mm.configAxisDirection(
             self.camera_motor, DIRECTION.POSITIVE)
 
         for axis in WHEEL_MOTORS:
-            self.machine_motion.configAxis(
+            self.mm.configAxis(
                 axis, MICRO_STEPS.ustep_8, MECH_GAIN.enclosed_timing_belt_mm_turn)
-            self.machine_motion.configAxisDirection(axis, DIRECTIONS[axis-2])
+            self.mm.configAxisDirection(axis, DIRECTIONS[axis-2])
 
-        self.machine_motion.emitAcceleration(50)
-        self.machine_motion.emitSpeed(80)
+        self.mm.emitAcceleration(50)
+        self.mm.emitSpeed(80)
 
     def correct_path(self):
         corrected_distance = get_distances(s, offsets)
@@ -482,13 +482,13 @@ class AcquisitionPage(QWidget):
 
         # Create if statement to indicate which motor moves
         if ang > 0.5:
-            self.machine_motion.moveRelative(
+            self.mm.moveRelative(
                 WHEEL_MOTORS[0], d_correction_mm)
-            self.machine_motion.waitForMotionCompletion()
+            self.mm.waitForMotionCompletion()
         elif ang < -0.5:
-            self.machine_motion.moveRelative(
+            self.mm.moveRelative(
                 WHEEL_MOTORS[1], d_correction_mm)
-            self.machine_motion.waitForMotionCompletion()
+            self.mm.waitForMotionCompletion()
 
     def generate_pots(self):
         images_df = pd.read_excel(IMAGES_SHEET)
@@ -502,9 +502,9 @@ class AcquisitionPage(QWidget):
     def acquisition_cleanup(self):
         global PROCESS_COMPLETE
         PROCESS_COMPLETE = True
-        self.machine_motion.moveToHome(self.camera_motor)
-        self.machine_motion.waitForMotionCompletion()
-        self.machine_motion.triggerEstop()
+        self.mm.moveToHome(self.camera_motor)
+        self.mm.waitForMotionCompletion()
+        self.mm.triggerEstop()
         self.acquisition_label.setText('Acquisition Process Complete')
         current_time = time.time()
         elapsed_time = int(current_time-self.start_time)
@@ -538,9 +538,9 @@ class AcquisitionPage(QWidget):
             elif j == 0 or j == 1:
                 self.correct_path()
 
-                self.machine_motion.moveRelativeCombined(
+                self.mm.moveRelativeCombined(
                     WHEEL_MOTORS, [DISTANCE_TRAVELED, DISTANCE_TRAVELED])
-                self.machine_motion.waitForMotionCompletion()
+                self.mm.waitForMotionCompletion()
             else:
                 self.correct_path()
 
@@ -558,9 +558,9 @@ class AcquisitionPage(QWidget):
                     os.startfile(path)
                     time.sleep(8)
                     # Move camera plate to next point
-                    self.machine_motion.moveRelative(
+                    self.mm.moveRelative(
                         self.camera_motor, total_distance)
-                    self.machine_motion.waitForMotionCompletion()
+                    self.mm.waitForMotionCompletion()
                     threading.Thread(target=file_rename()).start()
 
                 # Trigger image capture at last point
@@ -568,9 +568,9 @@ class AcquisitionPage(QWidget):
                 time.sleep(8)
                 threading.Thread(target=file_rename()).start()
 
-                self.machine_motion.moveRelativeCombined(
+                self.mm.moveRelativeCombined(
                     WHEEL_MOTORS, [DISTANCE_TRAVELED, DISTANCE_TRAVELED])
-                self.machine_motion.waitForMotionCompletion()
+                self.mm.waitForMotionCompletion()
 
         if STOP_EXEC:
             self.stop()
@@ -584,9 +584,9 @@ class AcquisitionPage(QWidget):
     def stop(self):
         global STOP_EXEC
         STOP_EXEC = True
-        self.machine_motion.moveToHome(self.camera_motor)
-        self.machine_motion.waitForMotionCompletion()
-        self.machine_motion.triggerEstop()
+        self.mm.moveToHome(self.camera_motor)
+        self.mm.waitForMotionCompletion()
+        self.mm.triggerEstop()
         if not PROCESS_COMPLETE:
             self.acquisition_label.setText('Acquisition Process Disrupted')
             self.time_label.setText('     Close the Application')

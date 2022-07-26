@@ -1,24 +1,25 @@
-import pandas as pd, openpyxl
- 
+import pandas as pd
+import openpyxl
+
 # opening the main sheet in read mode
-df  = pd.read_excel('SpeciesSheet.xlsx')
- 
+species_df = pd.read_excel('SpeciesSheet.xlsx')
+
 # getting row counts from main sheet
-colvalues = df[['RowNos']].values
-rarr = []
-for num in colvalues:
-   rarr.append(num[0])
- 
+row_numbers = species_df[['RowNos']].values
+row_list = []
+for num in row_numbers:
+    row_list.append(num[0])
+
 # getting species names from main sheet
-species = df[['SpeciesName']].values
-sarr = []
-for num in species:
-   sarr.append(num[0])
- 
+species = species_df[['SpeciesName']].values
+species_list = []
+for sp in species:
+    species_list.append(sp[0])
+
 # opening the secondary sheet in write mode
-wb = openpyxl.load_workbook('ImagesSheet.xlsx')
-sheet = wb.active
- 
+workbook = openpyxl.load_workbook('ImagesSheet.xlsx')
+sheet = workbook.active
+
 # scrub the sheet for new incoming data
 sheet.delete_cols(1, 2)
 sheet["A1"] = "SpeciesName"
@@ -26,20 +27,20 @@ sheet["B1"] = "ImagesCount"
 
 # add new data to the sheet
 s = 0
-for rownums in rarr:
-   arr1 = rownums.split(',')
-   species_row = []
-   for elmnt in arr1:
-      if '-' in elmnt:
-         arr2 = [int(e) for e in elmnt.split('-')]
-         for val in range(arr2[0], arr2[1]+1):
-               species_row.append(val)
-      else:
-         species_row.append(int(elmnt))
+for rows in row_list:
+    array_1 = rows.split(',')
+    species_row = []
+    for element in array_1:
+        if '-' in element:
+            array_2 = [int(e) for e in element.split('-')]
+            for val in range(array_2[0], array_2[1]+1):
+                species_row.append(val)
+        else:
+            species_row.append(int(element))
 
-   for val in species_row:
-       nam = str(species[s])[2:-2]
-       sheet.cell(row = val+1, column = 1).value = nam
-   s+= 1
-    
-wb.save('ImagesSheet.xlsx')
+    for val in species_row:
+        nam = str(species[s])[2:-2]
+        sheet.cell(row=val+1, column=1).value = nam
+    s += 1
+
+workbook.save('ImagesSheet.xlsx')
