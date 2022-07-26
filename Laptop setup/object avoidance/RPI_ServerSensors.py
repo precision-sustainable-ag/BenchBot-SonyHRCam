@@ -57,7 +57,11 @@ while True:
     if not data:
         break
 
-    json_data_received = json.loads(data)
+    try:
+        json_data_received = json.loads(data)
+    except Exception:
+        conn.sendall(bytearray('Invalid JSON error', 'utf8'))
+
     gpio_trigger_list = json_data_received.get("trigger_pins")
     gpio_echo_list = json_data_received.get("echo_pins")
 
@@ -68,8 +72,8 @@ while True:
 
     # Updating distances
     for k in range(0, len(gpio_trigger_list)):
-        trigger = gpio_trigger_list[k]
-        echo = gpio_echo_list[k]
+        trigger = int(gpio_trigger_list[k])
+        echo = int(gpio_echo_list[k])
 
         # Set GPIO direction (IN / OUT)
         GPIO.setup(trigger, GPIO.OUT)

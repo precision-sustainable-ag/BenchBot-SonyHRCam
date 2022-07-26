@@ -33,18 +33,18 @@ PI_PASSWORD = os.environ['PI_PASSWORD']
 # length of bench?
 DISTANCE_TRAVELED = os.environ['DISTANCE_TRAVELED']
 # if BB moving backwards change the motors order to [3,2]
-WHEEL_MOTORS = os.environ['WHEEL_MOTORS'].split(',')
+WHEEL_MOTORS = list(map(int, os.environ['WHEEL_MOTORS'].split(',')))
 # number of ultrasonic sensors on the robot
 NUMBER_OF_SENSORS = os.environ['NUMBER_OF_SENSORS']
 # json string describing the ultrasonic sensor pinout
 ULTRASONIC_SENSOR_LISTS = json.dumps({
     # the trigger pins for sensors
-    "trigger_pins": os.environ['TRIGGER_PINS'].split(','),
+    "trigger_pins": list(map(int, os.environ['TRIGGER_PINS'].split(','))),
     # the echo pins for sensors
-    "echo_pins": os.environ['ECHO_PINS'].split(','),
+    "echo_pins": list(map(int, os.environ['ECHO_PINS'].split(','))),
 })
 # reverse to move backwards or forwards
-DIRECTIONS = os.environ['DIRECTIONS'].split(','),
+DIRECTIONS = list(map(int, os.environ['WHEEL_MOTORS'].split(',')))
 
 ######## Do not change these #########
 # The server's hostname or IP address
@@ -82,8 +82,8 @@ def get_distances(s, offsets):
         ready = select.select([s], [], [], 10)
         if ready[0]:
             data = s.recv(4096)
-            if data == "Array size mismatch!":
-                return "Array size mismatch error!"
+            if "error" in str(data):
+                return data
 
         else:
             print("Sensor error!")
