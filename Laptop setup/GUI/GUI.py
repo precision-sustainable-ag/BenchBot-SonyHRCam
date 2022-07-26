@@ -464,6 +464,9 @@ class AcquisitionPage(QWidget):
 
     def correct_path(self):
         corrected_distance = get_distances(s, offsets)
+        if "error" in corrected_distance:
+            print(corrected_distance)
+            return
 
         # Getting angle
         ang = find_orientation(corrected_distance)
