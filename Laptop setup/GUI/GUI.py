@@ -1,5 +1,4 @@
 
-
 import os
 import sys
 import time
@@ -14,12 +13,15 @@ import socket
 import numpy as np
 from datetime import date
 import select
+from dotenv import load_dotenv
 
 from MachineMotion import *
 from PyQt6 import QtWidgets
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import *
 from PyQt6.QtGui import QIntValidator
+
+load_dotenv()
 
 ######## global vars fetched from .env file #########
 # Length of the robot (between front and back sensors) measured in cm
@@ -33,7 +35,11 @@ PI_PASSWORD = os.environ['PI_PASSWORD']
 # length of bench?
 DISTANCE_TRAVELED = os.environ['DISTANCE_TRAVELED']
 # if BB moving backwards change the motors order to [3,2]
+<<<<<<< HEAD
 WHEEL_MOTORS = list(map(int, os.environ['WHEEL_MOTORS'].split(',')))
+=======
+WHEEL_MOTORS =  list(map(int, os.environ['WHEEL_MOTORS'].split(',')))
+>>>>>>> da2c4e4c1a42f27771591f483a395ce7c683102a
 # number of ultrasonic sensors on the robot
 NUMBER_OF_SENSORS = os.environ['NUMBER_OF_SENSORS']
 # json string describing the ultrasonic sensor pinout
@@ -119,12 +125,12 @@ def find_orientation(distance):
 
 
 # INITIALIZING SERVER IN RPI
-ssh = paramiko.SSHClient()
-ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect(PI_HOST, username=PI_USERNAME, password=PI_PASSWORD)
-ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(
-    'python /home/{}/ultrasonic_calibration/RPI_ServerSensors.py &'.format(PI_USERNAME))
-time.sleep(2)
+##ssh = paramiko.SSHClient()
+##ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+##ssh.connect(PI_HOST, username=PI_USERNAME, password=PI_PASSWORD)
+##ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(
+##    'python /home/{}/ultrasonic_calibration/RPI_ServerSensors.py &'.format(PI_USERNAME))
+##time.sleep(2)
 
 
 # CONNECTING TO RPI SERVER
@@ -461,6 +467,8 @@ class AcquisitionPage(QWidget):
         for axis in WHEEL_MOTORS:
             self.mm.configAxis(
                 axis, MICRO_STEPS.ustep_8, MECH_GAIN.enclosed_timing_belt_mm_turn)
+            print(axis)
+            print(DIRECTIONS)
             self.mm.configAxisDirection(axis, DIRECTIONS[axis-2])
 
         self.mm.emitAcceleration(50)
