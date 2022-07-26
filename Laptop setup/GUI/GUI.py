@@ -57,6 +57,10 @@ STOP_EXEC = False
 PROCESS_COMPLETE = False
 # global flag to store the state
 STATE = ""
+# name of species sheet file
+SPECIES_SHEET = "SpeciesSheet.xlsx"
+# name of images sheet file
+IMAGES_SHEET = "ImagesSheet.xlsx"
 
 sys.path.append("..")
 
@@ -293,7 +297,7 @@ class SpeciesPage(QWidget):
     # used to update SpeciesSheet.xlsx
     def update_excel(self):
         count = int(self.total_species.currentText())
-        workbook = openpyxl.load_workbook('SpeciesSheet.xlsx')
+        workbook = openpyxl.load_workbook(SPECIES_SHEET)
         sheet = workbook.active
         for current_count in range(0, count):
             sheet.cell(row=current_count+2,
@@ -304,7 +308,7 @@ class SpeciesPage(QWidget):
             sheet.cell(row=current_count+2, column=1).value = ''
             sheet.cell(row=current_count+2, column=2).value = ''
             sheet.cell(row=current_count+2, column=3).value = ''
-        workbook.save('SpeciesSheet.xlsx')
+        workbook.save(SPECIES_SHEET)
         os.system("python sheetupdateSpecies.py")
         # time.sleep(0.1)
         threading.Thread(target=backup_sheet).start()
@@ -350,7 +354,7 @@ class ImagesPage(QWidget):
         self.layout.addWidget(self.images_label, 0, 2)
         self.layout.addWidget(self.next_button, 10, 3)
 
-        species_df = pd.read_excel('SpeciesSheet.xlsx')
+        species_df = pd.read_excel(SPECIES_SHEET)
         species_names = species_df[['SpeciesName']].values
         i = 0
         self.snaps = [None] * species_names.size
@@ -397,12 +401,12 @@ class ImagesPage(QWidget):
         button = confirm_dialog.exec()
 
         if button == QMessageBox.StandardButton.Yes:
-            workbook = openpyxl.load_workbook('SpeciesSheet.xlsx')
+            workbook = openpyxl.load_workbook(SPECIES_SHEET)
             sheet = workbook.active
             for snap in range(0, len(self.snaps)):
                 sheet.cell(
                     row=snap+2, column=3).value = self.snaps[snap].text()
-            workbook.save('SpeciesSheet.xlsx')
+            workbook.save(SPECIES_SHEET)
             os.system("python sheetupdatePictures.py")
             confirm_dialog.done(1)
             page = AcquisitionPage()
@@ -487,7 +491,7 @@ class AcquisitionPage(QWidget):
             self.machine_motion.waitForMotionCompletion()
 
     def generate_pots(self):
-        images_df = pd.read_excel('ImagesSheet.xlsx')
+        images_df = pd.read_excel(IMAGES_SHEET)
         image_counts = images_df[['ImagesCount']].values
         pots = []
         for num in image_counts:
