@@ -86,11 +86,11 @@ bool CameraDevice::connect(SCRSDK::CrSdkControlMode openMode)
 bool CameraDevice::disconnect()
 {
     m_spontaneous_disconnection = true;
-    tout << "Disconnect from camera...\n";
+    //tout << "Disconnect from camera...\n";
     // auto disconnect_status = m_cr_lib->Disconnect(m_device_handle);
     auto disconnect_status = SDK::Disconnect(m_device_handle);
     if (CR_FAILED(disconnect_status)) {
-        tout << "Disconnect failed to initialize.\n";
+        //tout << "Disconnect failed to initialize.\n";
         return false;
     }
     return true;
@@ -98,12 +98,12 @@ bool CameraDevice::disconnect()
 
 bool CameraDevice::release()
 {
-    tout << "Release camera...\n";
+    //tout << "Release camera...\n";
     // auto finalize_status = m_cr_lib->FinalizeDevice(m_device_handle);
     auto finalize_status = SDK::ReleaseDevice(m_device_handle);
     m_device_handle = 0; // clear
     if (CR_FAILED(finalize_status)) {
-        tout << "Finalize device failed to initialize.\n";
+        //tout << "Finalize device failed to initialize.\n";
         return false;
     }
     return true;
@@ -162,16 +162,20 @@ void CameraDevice::s1_shooting() const
 
 void CameraDevice::af_shutter() const
 {
-    text input;
+    /*
+	text input;
     tout << "Is the focus mode set to AF? (y/n): ";
     std::getline(tin, input);
     if (input != TEXT("y")) {
         tout << "Set the focus mode to AF\n";
         return;
     }
-
-    tout << "S1 shooting...\n";
-    tout << "Shutter Halfpress down\n";
+	*/
+	
+	std::this_thread::sleep_for(2.8s);
+	
+    //tout << "S1 shooting...\n";
+    //tout << "Shutter Halfpress down\n";
     SDK::CrDeviceProperty prop;
     prop.SetCode(SDK::CrDevicePropertyCode::CrDeviceProperty_S1);
     prop.SetCurrentValue(SDK::CrLockIndicator::CrLockIndicator_Locked);
@@ -180,17 +184,17 @@ void CameraDevice::af_shutter() const
 
     // Wait, then send shutter down
     std::this_thread::sleep_for(500ms);
-    tout << "Shutter down\n";
+    //tout << "Shutter down\n";
     SDK::SendCommand(m_device_handle, SDK::CrCommandId::CrCommandId_Release, SDK::CrCommandParam::CrCommandParam_Down);
 
     // Wait, then send shutter up
     std::this_thread::sleep_for(35ms);
-    tout << "Shutter up\n";
+    //tout << "Shutter up\n";
     SDK::SendCommand(m_device_handle, SDK::CrCommandId::CrCommandId_Release, SDK::CrCommandParam::CrCommandParam_Up);
 
     // Wait, then send shutter up
     std::this_thread::sleep_for(1s);
-    tout << "Shutter Halfpress up\n";
+    //tout << "Shutter Halfpress up\n";
     prop.SetCurrentValue(SDK::CrLockIndicator::CrLockIndicator_Unlocked);
     SDK::SetDeviceProperty(m_device_handle, &prop);
 }
@@ -1757,15 +1761,15 @@ text CameraDevice::get_id()
 void CameraDevice::OnConnected(SDK::DeviceConnectionVersioin version)
 {
     m_connected.store(true);
-    text id(this->get_id());
-    tout << "Connected to " << m_info->GetModel() << " (" << id.data() << ")\n";
+    // text id(this->get_id());
+    // tout << "Connected to " << m_info->GetModel() << " (" << id.data() << ")\n";
 }
 
 void CameraDevice::OnDisconnected(CrInt32u error)
 {
     m_connected.store(false);
     text id(this->get_id());
-    tout << "Disconnected from " << m_info->GetModel() << " (" << id.data() << ")\n";
+    // tout << "Disconnected from " << m_info->GetModel() << " (" << id.data() << ")\n";
     if ((false == m_spontaneous_disconnection) && (SDK::CrSdkControlMode_ContentsTransfer == m_modeSDK))
     {
         tout << "Please input '0' to return to the TOP-MENU\n";
@@ -1785,7 +1789,7 @@ void CameraDevice::OnLvPropertyChanged()
 void CameraDevice::OnCompleteDownload(CrChar* filename)
 {
     text file(filename);
-    tout << "Complete download. File: " << file.data() << '\n';
+    //tout << "Complete download. File: " << file.data() << '\n';
 }
 
 void CameraDevice::OnNotifyContentsTransfer(CrInt32u notify, SDK::CrContentHandle contentHandle, CrChar* filename)

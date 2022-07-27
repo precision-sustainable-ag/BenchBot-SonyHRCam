@@ -51,7 +51,7 @@ bool Release();
 extern "C"
 SCRSDK_API
 // This function enumerates the cameras that are connected to the pc via the protocol and the physical connection that the library supports.
-CrError EnumCameraObjects(ICrEnumCameraObjectInfo** ppEnumCameraObjectInfo, CrInt8u timeInSec = 3);
+CrError EnumCameraObjects(ICrEnumCameraObjectInfo** ppEnumCameraObjectInfo, CrInt8u timeInSec = 0.1);
 
 extern "C"
 SCRSDK_API
