@@ -1,4 +1,3 @@
-
 import os
 import sys
 import time
@@ -16,28 +15,28 @@ import select
 from dotenv import load_dotenv
 
 from MachineMotion import *
+sys.path.append("..")
 from PyQt6 import QtWidgets
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import *
 from PyQt6.QtGui import QIntValidator
 
-load_dotenv()
-
 ######## global vars fetched from .env file #########
+load_dotenv()
 # Length of the robot (between front and back sensors) measured in cm
-ROBOT_LENGTH = os.environ['ROBOT_LENGTH']
+ROBOT_LENGTH = int(os.environ['ROBOT_LENGTH'])
 # width of the robot (distance between two front wheels) in cm
-ROBOT_WIDTH = os.environ['ROBOT_WIDTH']
+ROBOT_WIDTH = int(os.environ['ROBOT_WIDTH'])
 # if you haven't changed your pi's name the default username is 'pi'
 PI_USERNAME = os.environ['PI_USERNAME']
 # if you haven't changed your pi's password, the default is 'raspberrypi'
 PI_PASSWORD = os.environ['PI_PASSWORD']
-# length of bench?
-DISTANCE_TRAVELED = os.environ['DISTANCE_TRAVELED']
+# Distance between rows in mm
+DISTANCE_TRAVELED = int(os.environ['DISTANCE_TRAVELED'])
 # if BB moving backwards change the motors order to [3,2]
 WHEEL_MOTORS = list(map(int, os.environ['WHEEL_MOTORS'].split(',')))
 # number of ultrasonic sensors on the robot
-NUMBER_OF_SENSORS = os.environ['NUMBER_OF_SENSORS']
+NUMBER_OF_SENSORS = int(os.environ['NUMBER_OF_SENSORS'])
 # json string describing the ultrasonic sensor pinout
 ULTRASONIC_SENSOR_LISTS = json.dumps({
     # the trigger pins for sensors
@@ -46,7 +45,9 @@ ULTRASONIC_SENSOR_LISTS = json.dumps({
     "echo_pins": list(map(int, os.environ['ECHO_PINS'].split(','))),
 })
 # reverse to move backwards or forwards
-DIRECTIONS = list(map(int, os.environ['WHEEL_MOTORS'].split(',')))
+DIRECTIONS = os.environ['DIRECTIONS'].split(',')
+# total distance between proximity sensors around camera plate
+HOME_TO_END_SENSOR_DISTANCE = int(os.environ['HOME_TO_END_SENSOR_DISTANCE'])
 
 ######## Do not change these #########
 # The server's hostname or IP address
@@ -63,8 +64,6 @@ STATE = ""
 SPECIES_SHEET = "SpeciesSheet.xlsx"
 # name of images sheet file
 IMAGES_SHEET = "ImagesSheet.xlsx"
-
-sys.path.append("..")
 
 ############################### Ultrasonic sensors and laptop-pi communication functions ###############################
 
@@ -121,13 +120,12 @@ def find_orientation(distance):
 
 
 # INITIALIZING SERVER IN RPI
-##ssh = paramiko.SSHClient()
-# ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-##ssh.connect(PI_HOST, username=PI_USERNAME, password=PI_PASSWORD)
-# ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(
-# 'python /home/{}/ultrasonic_calibration/RPI_ServerSensors.py &'.format(PI_USERNAME))
-# time.sleep(2)
-
+ssh = paramiko.SSHClient()
+ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+ssh.connect(PI_HOST, username=PI_USERNAME, password=PI_PASSWORD)
+ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(
+    'python /home/{}/ultrasonic_calibration/RPI_ServerSensors.py &'.format(PI_USERNAME))
+time.sleep(2)
 
 # CONNECTING TO RPI SERVER
 
@@ -319,6 +317,7 @@ class SpeciesPage(QWidget):
         main_window.addWidget(page)
         main_window.setCurrentIndex(main_window.currentIndex()+1)
 
+
 # create a SpeciesSheet.xlsx backup
 
 
@@ -463,8 +462,6 @@ class AcquisitionPage(QWidget):
         for axis in WHEEL_MOTORS:
             self.mm.configAxis(
                 axis, MICRO_STEPS.ustep_8, MECH_GAIN.enclosed_timing_belt_mm_turn)
-            print(axis)
-            print(DIRECTIONS)
             self.mm.configAxisDirection(axis, DIRECTIONS[axis-2])
 
         self.mm.emitAcceleration(50)
@@ -503,7 +500,7 @@ class AcquisitionPage(QWidget):
 
         return pots
 
-    def acquisition_cleanup(self):
+    def process_finished(self):
         global PROCESS_COMPLETE
         PROCESS_COMPLETE = True
         self.mm.moveToHome(self.camera_motor)
@@ -529,27 +526,22 @@ class AcquisitionPage(QWidget):
         global STOP_EXEC, PROCESS_COMPLETE
 
         self.configure_machine_motion()
-        self.create_directory()
-        pots = self.generate_pots()
-
         path = os.getcwd()+'\\RemoteCli\\RemoteCli.exe'
+        pots = self.generate_pots()
+        self.create_directory()
 
         direction = True
 
         for j in pots:
-            if STOP_EXEC:
-                break
-            elif j == 0 or j == 1:
-                self.correct_path()
-
-                self.mm.moveRelativeCombined(
-                    WHEEL_MOTORS, [DISTANCE_TRAVELED, DISTANCE_TRAVELED])
+            self.correct_path()
+            if j == 0 or j == 1:
+                if STOP_EXEC:
+                    break
+                self.mm.moveRelativeCombined(WHEEL_MOTORS, [DISTANCE_TRAVELED, DISTANCE_TRAVELED])
                 self.mm.waitForMotionCompletion()
             else:
-                self.correct_path()
-
                 # total distance between home and end sensor
-                total_distance = int(800/(j-1))
+                total_distance = int(HOME_TO_END_SENSOR_DISTANCE/(j-1))
 
                 if direction:
                     direction = False
@@ -558,28 +550,29 @@ class AcquisitionPage(QWidget):
                     direction = True
 
                 for i in range(1, j):
+                    if STOP_EXEC:
+                        break
                     # Trigger capture of image
                     os.startfile(path)
                     time.sleep(8)
                     # Move camera plate to next point
-                    self.mm.moveRelative(
-                        self.camera_motor, total_distance)
+                    self.mm.moveRelative(self.camera_motor, total_distance)
                     self.mm.waitForMotionCompletion()
                     threading.Thread(target=file_rename()).start()
-
+                if STOP_EXEC:
+                    break
                 # Trigger image capture at last point
                 os.startfile(path)
                 time.sleep(8)
                 threading.Thread(target=file_rename()).start()
 
-                self.mm.moveRelativeCombined(
-                    WHEEL_MOTORS, [DISTANCE_TRAVELED, DISTANCE_TRAVELED])
+                self.mm.moveRelativeCombined(WHEEL_MOTORS, [DISTANCE_TRAVELED, DISTANCE_TRAVELED])
                 self.mm.waitForMotionCompletion()
 
         if STOP_EXEC:
             self.stop()
         else:
-            self.acquisition_cleanup()
+            self.process_finished()
 
     def stop_thread(self):
         stopping = threading.Thread(target=self.stop)
