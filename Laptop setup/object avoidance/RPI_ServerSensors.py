@@ -3,34 +3,40 @@
 import socket
 import RPi.GPIO as GPIO
 import time
+import json
 
 # GPIO Mode (BOARD / BCM)
 GPIO.setmode(GPIO.BCM)
 
-def distance(trigger,echo):
+
+def distance(trigger, echo):
     # set Trigger to HIGH
+    print(trigger, echo)
     GPIO.output(trigger, True)
 
     # set Trigger after 0.01ms to LOW
     time.sleep(0.00001)
     GPIO.output(trigger, False)
 
-    StartTime = time.time()
-    StopTime = time.time()
+    start_time = time.time()
+    stop_time = time.time()
 
-    # save StartTime
+    # save start_time
+    print("start time")
     while GPIO.input(echo) == 0:
-        StartTime = time.time()
+        start_time = time.time()
 
+    print("stop time")
     # save time of arrival
     while GPIO.input(echo) == 1:
-        StopTime = time.time()
+        stop_time = time.time()
 
     # time difference between start and arrival
-    TimeElapsed = StopTime - StartTime
+    time_elapsed = stop_time - start_time
     # multiply with the sonic speed (34300 cm/s)
     # and divide by 2, because there and back
-    distance = (TimeElapsed * 34300) / 2
+    distance = (time_elapsed * 34300) / 2
+    print(distance)
 
     return distance
 
@@ -45,30 +51,38 @@ s.listen()
 conn, addr = s.accept()
 print(f"Connected by {addr}")
 
-# Setting up sensors
-GPIO_TRIGGER_LIST = [22, 18, 17, 5, 25, 2]
-GPIO_ECHO_LIST = [27, 23, 4, 19, 8, 3]
-
-# Initializing distances
-dist_list = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-
 while True:
     # Waiting for request
     data = conn.recv(1024)
     if not data:
         break
 
+    try:
+        json_data_received = json.loads(data)
+    except Exception:
+        conn.sendall(bytearray('Invalid JSON error', 'utf8'))
+
+    gpio_trigger_list = json_data_received.get("trigger_pins")
+    gpio_echo_list = json_data_received.get("echo_pins")
+
+    if len(gpio_trigger_list) != len(gpio_echo_list):
+        conn.sendall(bytearray('Array size mismatch!', 'utf8'))
+
+    dist_list = [0.0] * len(gpio_echo_list)
+
     # Updating distances
-    for k in range(0,len(GPIO_TRIGGER_LIST)):
-        trigger = GPIO_TRIGGER_LIST[k]
-        echo = GPIO_ECHO_LIST[k]
+    for k in range(0, len(gpio_trigger_list)):
+        trigger = int(gpio_trigger_list[k])
+        echo = int(gpio_echo_list[k])
 
         # Set GPIO direction (IN / OUT)
         GPIO.setup(trigger, GPIO.OUT)
         GPIO.setup(echo, GPIO.IN)
 
-        dist_list[k] = round(distance(trigger,echo),1)
+        dist_list[k] = round(distance(trigger, echo), 1)
+        print(dist_list)
 
     # Sending response
-    res = " ".join([str(d) for d in dist_list])
-    conn.sendall(bytearray(res,'utf8'))
+    response = " ".join([str(d) for d in dist_list])
+    print(response)
+    conn.sendall(bytearray(response, 'utf8'))
