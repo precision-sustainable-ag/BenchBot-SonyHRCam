@@ -1,0 +1,6 @@
+C:/Users/Priya/Documents/SDK/out/build/x64-Release/CMakeFiles/RemoteCli.dir
+C:/Users/Priya/Documents/SDK/out/build/x64-Release/CMakeFiles/install/local.dir
+C:/Users/Priya/Documents/SDK/out/build/x64-Release/CMakeFiles/install.dir
+C:/Users/Priya/Documents/SDK/out/build/x64-Release/CMakeFiles/edit_cache.dir
+C:/Users/Priya/Documents/SDK/out/build/x64-Release/CMakeFiles/rebuild_cache.dir
+C:/Users/Priya/Documents/SDK/out/build/x64-Release/CMakeFiles/list_install_components.dir

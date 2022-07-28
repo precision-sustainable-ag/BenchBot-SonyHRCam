@@ -1,0 +1,6 @@
+C:/Users/Priya/Documents/SDK/out/install/x64-Release/./RemoteCli.exe
+C:/Users/Priya/Documents/SDK/out/install/x64-Release/./CrAdapter/Cr_PTP_IP.dll
+C:/Users/Priya/Documents/SDK/out/install/x64-Release/./CrAdapter/Cr_PTP_USB.dll
+C:/Users/Priya/Documents/SDK/out/install/x64-Release/./CrAdapter/libusb-1.0.dll
+C:/Users/Priya/Documents/SDK/out/install/x64-Release/./Cr_Core.dll
+C:/Users/Priya/Documents/SDK/out/install/x64-Release/./Cr_Core.lib
