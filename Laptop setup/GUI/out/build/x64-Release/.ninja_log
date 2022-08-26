@@ -1,0 +1,10 @@
+# ninja log v5
+20	2749	6800281256840246	CMakeFiles/RemoteCli.dir/app/Text.cpp.obj	8bf0ccdffb7fb55f
+7	3121	6800281258485838	CMakeFiles/RemoteCli.dir/app/ConnectionInfo.cpp.obj	ada7a7ab194e55f2
+7442	8228	6800281312203381	RemoteCli.exe	d2a7255578441bee
+11	3787	6800281267631445	CMakeFiles/RemoteCli.dir/app/PropertyValueTable.cpp.obj	9a0f1ec424cbecd4
+25	4208	6800281272139340	CMakeFiles/RemoteCli.dir/app/MessageDefine.cpp.obj	8d73b60497f42492
+15	5280	6800281282401898	CMakeFiles/RemoteCli.dir/app/RemoteCli.cpp.obj	4da4adfe81ff5185
+0	7442	6800281304546316	CMakeFiles/RemoteCli.dir/app/CameraDevice.cpp.obj	883689f5a09b7afd
+8228	8396	0	CMakeFiles/install.util	ec25d7f02c0aaed3
+1	67	0	CMakeFiles/install.util	ec25d7f02c0aaed3
