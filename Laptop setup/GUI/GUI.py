@@ -14,7 +14,7 @@ from datetime import date
 import select
 from dotenv import load_dotenv
 
-from MachineMotion import *
+from support.MachineMotion import *
 sys.path.append("..")
 from PyQt6 import QtWidgets
 from PyQt6.QtCore import QTimer
@@ -61,9 +61,9 @@ PROCESS_COMPLETE = False
 # global flag to store the state
 STATE = ""
 # name of species sheet file
-SPECIES_SHEET = "SpeciesSheet.xlsx"
+SPECIES_SHEET = "support\\SpeciesSheet.xlsx"
 # name of images sheet file
-IMAGES_SHEET = "ImagesSheet.xlsx"
+IMAGES_SHEET = "support\\ImagesSheet.xlsx"
 
 ############################### Ultrasonic sensors and laptop-pi communication functions ###############################
 
@@ -135,7 +135,7 @@ s.connect((PI_HOST, PI_PORT))
 
 
 # LOADING OFFSETS
-offsets = np.loadtxt('SensorOffsets.csv', delimiter=',',
+offsets = np.loadtxt('support\\SensorOffsets.csv', delimiter=',',
                      skiprows=1)  # delimiter added
 print(offsets)
 
@@ -309,7 +309,7 @@ class SpeciesPage(QWidget):
             sheet.cell(row=current_count+2, column=2).value = ''
             sheet.cell(row=current_count+2, column=3).value = ''
         workbook.save(SPECIES_SHEET)
-        os.system("python sheetupdateSpecies.py")
+        os.system("python support\sheetupdateSpecies.py")
         # time.sleep(0.1)
         threading.Thread(target=backup_sheet).start()
 
@@ -323,17 +323,18 @@ class SpeciesPage(QWidget):
 
 def backup_sheet():
     # create a copy of the sheet
-    shutil.copy("SpeciesSheet.xlsx", "new.xlsx")
-
+    new_sheet = "support\\new.xlsx"
+    shutil.copy(SPECIES_SHEET, new_sheet)
+    
     # delete the images column
-    workbook = openpyxl.load_workbook('new.xlsx')
+    workbook = openpyxl.load_workbook(new_sheet)
     sheet = workbook.active
     sheet.delete_cols(3, 1)
-    workbook.save('new.xlsx')
+    workbook.save(new_sheet)
 
     # include date in file name
     today = datetime.datetime.today().strftime('%d-%b-%Y')
-    os.rename(r'new.xlsx', r'SpeciesSheet_' + STATE + str(today) + '.xlsx')
+    os.rename(r'support\new.xlsx', r'support\SpeciesSheet_' + STATE + str(today) + '.xlsx')
 
 
 # window class used to update the number of images per row
@@ -408,7 +409,7 @@ class ImagesPage(QWidget):
                 sheet.cell(
                     row=snap+2, column=3).value = self.snaps[snap].text()
             workbook.save(SPECIES_SHEET)
-            os.system("python sheetupdatePictures.py")
+            os.system("python support\sheetupdatePictures.py")
             confirm_dialog.done(1)
             page = AcquisitionPage()
             main_window.addWidget(page)
