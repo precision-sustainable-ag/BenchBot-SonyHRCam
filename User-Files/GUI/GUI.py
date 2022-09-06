@@ -1,5 +1,3 @@
-# testfile for latest changes
-
 import os
 import sys
 import time
@@ -76,8 +74,34 @@ CAM_PATH = os.getcwd() / support_dir / "RemoteCli" / "RemoteCli.exe"
 
 # Helper function for getting distance measurements from sensor
 
-def get_distances(offsets):
-    return [23, 23]
+def get_distances(s, offsets):
+    # Number of queries of sensor measurements
+    dist_list = np.zeros((NUMBER_OF_SENSORS, NUMBER_OF_SENSORS))
+    dist_raw = np.zeros((NUMBER_OF_SENSORS, NUMBER_OF_SENSORS))
+
+    for k in range(0, NUMBER_OF_SENSORS):
+        # Sending a request for data and receiving it
+        s.sendall(bytes(ULTRASONIC_SENSOR_LISTS, encoding="utf-8"))
+
+        # use timeout of 10 seconds to wait for sensor response
+        ready = select.select([s], [], [], 10)
+        if ready[0]:
+            data = s.recv(4096)
+            if "error" in str(data):
+                return data
+
+        else:
+            print("Sensor error!")
+            return "Sensor error!"
+        time.sleep(0.25)
+
+        # Parsing the measurements
+        for i, item in enumerate(data.split()):
+            dist_raw[k, i] = float(item)
+            dist_list[k, i] = float(item) - offsets[i % 3]
+
+    dist_list = np.median(dist_list, 0)
+    return dist_list
 
 def find_orientation(distance):
     theta = np.arctan2((distance[0]-distance[1]), ROBOT_LENGTH) * 180 / np.pi
@@ -87,8 +111,21 @@ def find_orientation(distance):
 
 ########################################## Establish connection with pi #############################################
 
-# LOADING OFFSETS
+# INITIALIZING SERVER IN RPI
+ssh = paramiko.SSHClient()
+ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+ssh.connect(PI_HOST, username=PI_USERNAME, password=PI_PASSWORD)
+ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(
+    'python /home/{}/ultrasonic_calibration/RPI_ServerSensors.py &'.format(PI_USERNAME))
+time.sleep(2)
 
+# CONNECTING TO RPI SERVER
+
+# Setting up the connection
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect((PI_HOST, PI_PORT))
+
+# LOADING OFFSETS
 csv_file = support_dir / "SensorOffsets.csv"
 offsets = np.loadtxt(csv_file, delimiter=',', skiprows=1)
 
@@ -302,7 +339,6 @@ class SpeciesPage(QWidget):
 
 def backup_sheet():
     # create a copy of the sheet
-    # new_sheet = os.path.join(support_dir, "new.xlsx")
     new_sheet = support_dir / "new.xlsx"
     shutil.copy(SPECIES_SHEET, new_sheet)
     
@@ -442,10 +478,10 @@ class AcquisitionPage(QWidget):
         self.mm.configAxisDirection(
             self.camera_motor, DIRECTION.POSITIVE)
 
-        # for axis in WHEEL_MOTORS:
-            # self.mm.configAxis(
-                # axis, MICRO_STEPS.ustep_8, MECH_GAIN.enclosed_timing_belt_mm_turn)
-            # self.mm.configAxisDirection(axis, DIRECTIONS[axis-2])
+        for axis in WHEEL_MOTORS:
+            self.mm.configAxis(
+                axis, MICRO_STEPS.ustep_8, MECH_GAIN.enclosed_timing_belt_mm_turn)
+            self.mm.configAxisDirection(axis, DIRECTIONS[axis-2])
 
         self.mm.emitAcceleration(50)
         self.mm.emitSpeed(80)
@@ -470,7 +506,7 @@ class AcquisitionPage(QWidget):
             os.mkdir("SONY")
 
     def correct_path(self):
-        corrected_distance = get_distances(offsets)
+        corrected_distance = get_distances(s, offsets)
         if "error" in corrected_distance:
             print(corrected_distance)
             return
@@ -500,7 +536,7 @@ class AcquisitionPage(QWidget):
     def file_rename(self, timestamp):
         time.sleep(4)
         for file_name in os.listdir('.'):
-            if file_name.startswith(STATE+'A'):
+            if file_name.startswith(STATE+'X'):
                 if file_name.endswith('.JPG'):
                     new_name = f"{STATE}_{timestamp}.JPG"
                 elif file_name.endswith('.ARW'):
@@ -595,8 +631,8 @@ class AcquisitionPage(QWidget):
             if pots == 0 or pots == 1:
                 if STOP_EXEC:
                     break
-                # self.mm.moveRelativeCombined(WHEEL_MOTORS, [DISTANCE_TRAVELED, DISTANCE_TRAVELED])
-                # self.mm.waitForMotionCompletion()
+                self.mm.moveRelativeCombined(WHEEL_MOTORS, [DISTANCE_TRAVELED, DISTANCE_TRAVELED])
+                self.mm.waitForMotionCompletion()
             else:
                 # total distance between home and end sensor
                 total_distance = int(HOME_TO_END_SENSOR_DISTANCE/(pots-1))
@@ -613,8 +649,8 @@ class AcquisitionPage(QWidget):
                 self.move_files()
 
                 direction = not direction
-                # self.mm.moveRelativeCombined(WHEEL_MOTORS, [DISTANCE_TRAVELED, DISTANCE_TRAVELED])
-                # self.mm.waitForMotionCompletion()
+                self.mm.moveRelativeCombined(WHEEL_MOTORS, [DISTANCE_TRAVELED, DISTANCE_TRAVELED])
+                self.mm.waitForMotionCompletion()
 
         if STOP_EXEC:
             self.stop()
