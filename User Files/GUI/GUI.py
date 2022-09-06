@@ -1,3 +1,5 @@
+# testfile for latest changes
+
 import os
 import sys
 import time
@@ -7,15 +9,17 @@ import threading
 import string
 import shutil
 import datetime
-import paramiko
-import socket
+import cv2
+import depthai as dai
 import numpy as np
+from pathlib import Path
 from datetime import date
-import select
 from dotenv import load_dotenv
+from subprocess import call
 
-from support.MachineMotion import *
 sys.path.append("..")
+sys.path.append("support")
+from MachineMotion import *
 from PyQt6 import QtWidgets
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import *
@@ -61,56 +65,21 @@ PROCESS_COMPLETE = False
 # global flag to store the state
 STATE = ""
 # name of species sheet file
-SPECIES_SHEET = "support\\SpeciesSheet.xlsx"
+support_dir = Path("support")
+SPECIES_SHEET = support_dir / "SpeciesSheet.xlsx"
 # name of images sheet file
-IMAGES_SHEET = "support\\ImagesSheet.xlsx"
+IMAGES_SHEET = support_dir / "ImagesSheet.xlsx"
+# path of the camera script
+CAM_PATH = os.getcwd() / support_dir / "RemoteCli" / "RemoteCli.exe"
 
 ############################### Ultrasonic sensors and laptop-pi communication functions ###############################
 
 # Helper function for getting distance measurements from sensor
 
-
-def get_distances(s, offsets):
-    # Number of queries of sensor measurements
-    dist_list = np.zeros((NUMBER_OF_SENSORS, NUMBER_OF_SENSORS))
-    dist_raw = np.zeros((NUMBER_OF_SENSORS, NUMBER_OF_SENSORS))
-
-    for k in range(0, NUMBER_OF_SENSORS):
-        # Sending a request for data and receiving it
-        s.sendall(bytes(ULTRASONIC_SENSOR_LISTS, encoding="utf-8"))
-
-        # use timeout of 10 seconds to wait for sensor response
-        ready = select.select([s], [], [], 10)
-        if ready[0]:
-            data = s.recv(4096)
-            if "error" in str(data):
-                return data
-
-        else:
-            print("Sensor error!")
-            return "Sensor error!"
-        time.sleep(0.25)
-
-        # Parsing the measurements
-        for i, item in enumerate(data.split()):
-            dist_raw[k, i] = float(item)
-            dist_list[k, i] = float(item) - offsets[i % 3]
-
-    dist_list = np.median(dist_list, 0)
-    return dist_list
-
-# Helper function for computing orientation of robot
-
+def get_distances(offsets):
+    return [23, 23]
 
 def find_orientation(distance):
-    '''
-    :param distance: np array. Average of N distances measured by the ultrasonic sensors. Array[0]=
-    front right sensor, Array[1]= back right sensor.
-    :param ROBOT_LENGTH: distance in cm from front right to back right sensor
-    :return: angle of drift from straight trajectory
-    '''
-    print('distance[0]=', distance[0])
-    print('distance[1]=', distance[1])
     theta = np.arctan2((distance[0]-distance[1]), ROBOT_LENGTH) * 180 / np.pi
     return theta
 
@@ -118,26 +87,36 @@ def find_orientation(distance):
 
 ########################################## Establish connection with pi #############################################
 
-
-# INITIALIZING SERVER IN RPI
-ssh = paramiko.SSHClient()
-ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect(PI_HOST, username=PI_USERNAME, password=PI_PASSWORD)
-ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(
-    'python /home/{}/ultrasonic_calibration/RPI_ServerSensors.py &'.format(PI_USERNAME))
-time.sleep(2)
-
-# CONNECTING TO RPI SERVER
-
-# Setting up the connection
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect((PI_HOST, PI_PORT))
-
-
 # LOADING OFFSETS
-offsets = np.loadtxt('support\\SensorOffsets.csv', delimiter=',',
-                     skiprows=1)  # delimiter added
-print(offsets)
+
+csv_file = support_dir / "SensorOffsets.csv"
+offsets = np.loadtxt(csv_file, delimiter=',', skiprows=1)
+
+########################### OAK-D Funcs ###########################
+def flushframes():
+  for i in range(50):
+    frame = queue.get()
+
+def save_oak_image(timestamp):
+  flushframes()
+  filename = f"{STATE}_OAK_{timestamp}.png"
+  frame = queue.get()
+  imOut = frame.getCvFrame()
+  cv2.imwrite(filename, imOut)
+
+pipeline = dai.Pipeline()
+camRgb = pipeline.create(dai.node.ColorCamera)
+camRgb.setPreviewSize(3840, 2160)
+camRgb.setBoardSocket(dai.CameraBoardSocket.RGB)
+xoutRgb = pipeline.create(dai.node.XLinkOut)
+camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_4_K)
+camRgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.RGB)
+xoutRgb.setStreamName("rgb")
+camRgb.preview.link(xoutRgb.input)
+device = dai.Device(pipeline)
+queue = device.getOutputQueue(name="rgb")
+
+###################################################################
 
 
 # main window class for selecting metadata
@@ -309,7 +288,7 @@ class SpeciesPage(QWidget):
             sheet.cell(row=current_count+2, column=2).value = ''
             sheet.cell(row=current_count+2, column=3).value = ''
         workbook.save(SPECIES_SHEET)
-        os.system("python support\sheetupdateSpecies.py")
+        call(["python", support_dir / "sheetupdateSpecies.py"])
         # time.sleep(0.1)
         threading.Thread(target=backup_sheet).start()
 
@@ -323,7 +302,8 @@ class SpeciesPage(QWidget):
 
 def backup_sheet():
     # create a copy of the sheet
-    new_sheet = "support\\new.xlsx"
+    # new_sheet = os.path.join(support_dir, "new.xlsx")
+    new_sheet = support_dir / "new.xlsx"
     shutil.copy(SPECIES_SHEET, new_sheet)
     
     # delete the images column
@@ -333,9 +313,10 @@ def backup_sheet():
     workbook.save(new_sheet)
 
     # include date in file name
-    today = datetime.datetime.today().strftime('%d-%b-%Y')
-    os.rename(r'support\new.xlsx', r'support\SpeciesSheet_' + STATE + str(today) + '.xlsx')
-
+    current_date = datetime.datetime.today().strftime('%d-%b-%Y')
+    new_name = support_dir / f"SpeciesSheet_{STATE}_{current_date}.xlsx"
+    os.rename(new_sheet, new_name)
+    
 
 # window class used to update the number of images per row
 
@@ -409,13 +390,14 @@ class ImagesPage(QWidget):
                 sheet.cell(
                     row=snap+2, column=3).value = self.snaps[snap].text()
             workbook.save(SPECIES_SHEET)
-            os.system("python support\sheetupdatePictures.py")
+            call(["python", support_dir / "sheetupdatePictures.py"])
             confirm_dialog.done(1)
             page = AcquisitionPage()
             main_window.addWidget(page)
             main_window.setCurrentIndex(main_window.currentIndex()+1)
         else:
             confirm_dialog.done(1)
+
 
 # window class that handles the acquisition process and updates the user on what's happening
 
@@ -460,27 +442,43 @@ class AcquisitionPage(QWidget):
         self.mm.configAxisDirection(
             self.camera_motor, DIRECTION.POSITIVE)
 
-        for axis in WHEEL_MOTORS:
-            self.mm.configAxis(
-                axis, MICRO_STEPS.ustep_8, MECH_GAIN.enclosed_timing_belt_mm_turn)
-            self.mm.configAxisDirection(axis, DIRECTIONS[axis-2])
+        # for axis in WHEEL_MOTORS:
+            # self.mm.configAxis(
+                # axis, MICRO_STEPS.ustep_8, MECH_GAIN.enclosed_timing_belt_mm_turn)
+            # self.mm.configAxisDirection(axis, DIRECTIONS[axis-2])
 
         self.mm.emitAcceleration(50)
         self.mm.emitSpeed(80)
 
+    def generate_pots_list(self):
+        images_df = pd.read_excel(IMAGES_SHEET)
+        image_counts = images_df[['ImagesCount']].values
+        rows = []
+        for num in image_counts:
+            rows.append(num[0])
+        return rows
+
+    def create_directory(self):
+        # Create new directory where today's images will be saved.
+        directory_name = f'{STATE}_{date.today()}'
+        if directory_name not in os.listdir():
+            os.mkdir(directory_name)
+        os.chdir(directory_name)
+        if "OAK" not in os.listdir():
+            os.mkdir("OAK")
+        if "SONY" not in os.listdir():
+            os.mkdir("SONY")
+
     def correct_path(self):
-        corrected_distance = get_distances(s, offsets)
+        corrected_distance = get_distances(offsets)
         if "error" in corrected_distance:
             print(corrected_distance)
             return
 
         # Getting angle
         ang = find_orientation(corrected_distance)
-        print('debug_angle=', ang)
-
         # Calculate how much distance motor needs to move to align platform
         d_correction_mm = 2*np.pi*ROBOT_WIDTH*(abs(ang)/360)*10
-        print('debug_d_correction_mm=', d_correction_mm)
 
         # Create if statement to indicate which motor moves
         if ang > 0.5:
@@ -491,15 +489,25 @@ class AcquisitionPage(QWidget):
             self.mm.moveRelative(
                 WHEEL_MOTORS[1], d_correction_mm)
             self.mm.waitForMotionCompletion()
-
-    def generate_pots(self):
-        images_df = pd.read_excel(IMAGES_SHEET)
-        image_counts = images_df[['ImagesCount']].values
-        pots = []
-        for num in image_counts:
-            pots.append(num[0])
-
-        return pots
+    
+    def capture_image(self):
+        t = str(int(time.time()))
+        os.startfile(CAM_PATH)
+        save_oak_image(t)
+        time.sleep(8)
+        threading.Thread(target=self.file_rename(t)).start()
+    
+    def file_rename(self, timestamp):
+        time.sleep(4)
+        for file_name in os.listdir('.'):
+            if file_name.startswith(STATE+'A'):
+                if file_name.endswith('.JPG'):
+                    new_name = f"{STATE}_{timestamp}.JPG"
+                elif file_name.endswith('.ARW'):
+                    new_name = f"{STATE}_{timestamp}.ARW"
+                os.rename(file_name, new_name)
+            else:
+                continue
 
     def process_finished(self):
         global PROCESS_COMPLETE
@@ -514,66 +522,6 @@ class AcquisitionPage(QWidget):
         elapsed_min = int(elapsed_time/60) - 60*elapsed_hr
         self.time_label.setText(
             'Total time taken: '+str(elapsed_hr) + ' hrs '+str(elapsed_min) + ' mins')
-
-    def create_directory(self):
-        # Create new directory where today's images will be saved.
-        directory_name = f'{STATE}_{date.today()}'
-        if directory_name not in os.listdir():
-            os.mkdir(f'{os.getcwd()}\{directory_name}')
-        os.chdir(f'{os.getcwd()}\{directory_name}')
-
-    # moves benchbot and captures images
-    def acquisition_process(self):
-        global STOP_EXEC, PROCESS_COMPLETE
-
-        self.configure_machine_motion()
-        path = os.getcwd()+'\\RemoteCli\\RemoteCli.exe'
-        pots = self.generate_pots()
-        self.create_directory()
-
-        direction = True
-
-        for j in pots:
-            self.correct_path()
-            if j == 0 or j == 1:
-                if STOP_EXEC:
-                    break
-                self.mm.moveRelativeCombined(WHEEL_MOTORS, [DISTANCE_TRAVELED, DISTANCE_TRAVELED])
-                self.mm.waitForMotionCompletion()
-            else:
-                # total distance between home and end sensor
-                total_distance = int(HOME_TO_END_SENSOR_DISTANCE/(j-1))
-
-                if direction:
-                    direction = False
-                else:
-                    total_distance = -total_distance
-                    direction = True
-
-                for i in range(1, j):
-                    if STOP_EXEC:
-                        break
-                    # Trigger capture of image
-                    os.startfile(path)
-                    time.sleep(8)
-                    # Move camera plate to next point
-                    self.mm.moveRelative(self.camera_motor, total_distance)
-                    self.mm.waitForMotionCompletion()
-                    threading.Thread(target=file_rename()).start()
-                if STOP_EXEC:
-                    break
-                # Trigger image capture at last point
-                os.startfile(path)
-                time.sleep(8)
-                threading.Thread(target=file_rename()).start()
-
-                self.mm.moveRelativeCombined(WHEEL_MOTORS, [DISTANCE_TRAVELED, DISTANCE_TRAVELED])
-                self.mm.waitForMotionCompletion()
-
-        if STOP_EXEC:
-            self.stop()
-        else:
-            self.process_finished()
 
     def stop_thread(self):
         stopping = threading.Thread(target=self.stop)
@@ -600,19 +548,79 @@ class AcquisitionPage(QWidget):
             self.time_label.setText(
                 '     Time Elapsed: '+str(elapsed_hr) + ' hrs '+str(elapsed_min) + ' mins')
 
+    def round(self, pots, distance):
+        for i in range(1, pots):
+            if STOP_EXEC:
+                break
+            # Trigger capture of image
+            self.capture_image()
+            # Move camera plate to next point
+            self.mm.moveRelative(self.camera_motor, distance)
+            self.mm.waitForMotionCompletion()
+        # Trigger image capture at last point 
+        if STOP_EXEC:
+            return          
+        self.capture_image()
 
-def file_rename():
-    time.sleep(2)
-    t = str(int(time.time()))
-    for file_name in os.listdir('.'):
-        if file_name.startswith(STATE+'X'):
-            if file_name.endswith('.JPG'):
-                new_name = f"{STATE}_{t}.JPG"
-            elif file_name.endswith('.ARW'):
-                new_name = f"{STATE}_{t}.ARW"
+    ##### change logic for repeating rounds
+    def repeat_round(self, expected_count):
+        filelist = [name for name in os.listdir('.') if os.path.isfile(name)]
+        actual_count = len(filelist)
+        if ((expected_count*3)>actual_count):
+            # scrub directory of the files
+            for file in filelist:
+                os.remove(file)            
+            return True
         else:
-            continue
-        os.rename(f"{file_name}", f"{new_name}")
+            return False
+
+    def move_files(self):
+        for file in os.listdir('.'):
+            if file.startswith(STATE+'_OAK'):
+                shutil.move(file, "OAK")
+            elif file.startswith(STATE):
+                shutil.move(file, "SONY")
+            else:
+                continue
+
+    # moves benchbot and captures images
+    def acquisition_process(self):
+        self.configure_machine_motion()
+        total_rows = self.generate_pots_list()
+        self.create_directory()
+        direction = True
+
+        for pots in total_rows:
+            self.correct_path()
+            if pots == 0 or pots == 1:
+                if STOP_EXEC:
+                    break
+                # self.mm.moveRelativeCombined(WHEEL_MOTORS, [DISTANCE_TRAVELED, DISTANCE_TRAVELED])
+                # self.mm.waitForMotionCompletion()
+            else:
+                # total distance between home and end sensor
+                total_distance = int(HOME_TO_END_SENSOR_DISTANCE/(pots-1))
+
+                if not direction:
+                    total_distance *= -1
+                self.round(pots, total_distance)
+
+                if self.repeat_round(pots):
+                    total_distance *= -1
+                    direction = not direction
+                    self.round(pots, total_distance)
+                
+                self.move_files()
+
+                direction = not direction
+                # self.mm.moveRelativeCombined(WHEEL_MOTORS, [DISTANCE_TRAVELED, DISTANCE_TRAVELED])
+                # self.mm.waitForMotionCompletion()
+
+        if STOP_EXEC:
+            self.stop()
+        else:
+            self.process_finished()
+
 
 
 if __name__ == "__main__":
