@@ -7,6 +7,9 @@ import threading
 import string
 import shutil
 import datetime
+import paramiko
+import socket
+import select
 import cv2
 import depthai as dai
 import numpy as np
