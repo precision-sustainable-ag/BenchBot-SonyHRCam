@@ -66,4 +66,3 @@ dependencies:
     - six==1.16.0
     - urllib3==1.26.12
     - zstandard==0.18.0
-prefix: C:\Users\Priya\anaconda3\envs\bb_env

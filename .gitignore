@@ -1,2 +1,30 @@
-.venv/
-.env.DS_Store
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# pyenv
+.python-version
+
+# PEP 582
+__pypackages__/
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Mac OS default file
+.DS_Store
+
+# Ignore datasheets that may change depending on location and timing. Retains local configuration after pulls or new versions
+**.xlsx
+**.csv
+
+# VS code IDE
+**.vscode
+**.vs

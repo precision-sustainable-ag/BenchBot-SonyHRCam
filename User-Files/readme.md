@@ -20,4 +20,3 @@
 > On the command line run 
 >> conda env create -f environment.yml
 >>>conda activate bb_env
->> 
