@@ -105,10 +105,23 @@ def get_distances(s, offsets):
 
     dist_list = np.median(dist_list, 0)
     return dist_list
+ 
+
+# Helper function for computing orientation of robot
+
 
 def find_orientation(distance):
+    '''
+    :param distance: np array. Average of N distances measured by the ultrasonic sensors. Array[0]=
+    front right sensor, Array[1]= back right sensor.
+    :param ROBOT_LENGTH: distance in cm from front right to back right sensor
+    :return: angle of drift from straight trajectory
+    '''
+    print('distance[0]=', distance[0])
+    print('distance[1]=', distance[1])
     theta = np.arctan2((distance[0]-distance[1]), ROBOT_LENGTH) * 180 / np.pi
     return theta
+
 
 ############################ End Ultrasonic sensors and laptop-pi communication functions #############################
 
