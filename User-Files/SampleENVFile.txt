@@ -1,0 +1,22 @@
+# Length of the robot: distance between front and back ultrasonic sensors measured in cm.
+ROBOT_LENGTH = 133
+# Width of the robot: distance between the two motorized wheels in cm.
+ROBOT_WIDTH = 215
+# Distance between the home and end sensors on the ball screw (where the camera plate is mounted) in mm. 
+HOME_TO_END_SENSOR_DISTANCE = 1000
+# if you haven't changed your pi's name the default username is 'pi'
+PI_USERNAME = 'pi_username'
+# if you haven't changed your pi's password, the default is 'raspberry'
+PI_PASSWORD = 'pi_password'
+# Distance that the BenchBot will travel between stops. These are the wheel motors, not the camera plate motor. 
+DISTANCE_TRAVELED = 400
+# Which driver in the machine motion controller is connected to which wheel motor.
+WHEEL_MOTORS = '3,2'
+# Number of ultrasonic sensors being used
+NUMBER_OF_SENSORS = 2
+# The GPIOs being used as trigger for the ultrasonic sensors
+TRIGGER_PINS = '23,17'
+# The GPIOs being used as echo for the ultrasonic sensors
+ECHO_PINS = '18,4'
+# Direction in which the wheel motors are moving
+DIRECTIONS = 'negative,positive'
