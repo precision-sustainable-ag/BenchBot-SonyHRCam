@@ -1,8 +1,14 @@
 import pandas as pd
 import openpyxl
+from pathlib import Path
+
+# define the excel sheet files
+support_dir = Path("support")
+species_file = support_dir / "SpeciesSheet.xlsx"
+images_file = support_dir / "ImagesSheet.xlsx"
 
 # opening the main sheet in read mode
-species_df = pd.read_excel('support\\SpeciesSheet.xlsx')
+species_df = pd.read_excel(species_file)
 
 # getting row counts from main sheet
 row_numbers = species_df[['RowNos']].values
@@ -17,7 +23,7 @@ for sp in species:
     species_list.append(sp[0])
 
 # opening the secondary sheet in write mode
-workbook = openpyxl.load_workbook('support\\ImagesSheet.xlsx')
+workbook = openpyxl.load_workbook(images_file)
 sheet = workbook.active
 
 # scrub the sheet for new incoming data
@@ -43,4 +49,4 @@ for rows in row_list:
         sheet.cell(row=val+1, column=1).value = nam
     s += 1
 
-workbook.save('support\\ImagesSheet.xlsx')
+workbook.save(images_file)
