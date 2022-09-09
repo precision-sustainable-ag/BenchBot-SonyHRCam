@@ -1,0 +1,7 @@
+/home/pi/sony_sdk/sdk/build/CMakeFiles/install/strip.dir
+/home/pi/sony_sdk/sdk/build/CMakeFiles/install/local.dir
+/home/pi/sony_sdk/sdk/build/CMakeFiles/install.dir
+/home/pi/sony_sdk/sdk/build/CMakeFiles/list_install_components.dir
+/home/pi/sony_sdk/sdk/build/CMakeFiles/rebuild_cache.dir
+/home/pi/sony_sdk/sdk/build/CMakeFiles/edit_cache.dir
+/home/pi/sony_sdk/sdk/build/CMakeFiles/RemoteCli.dir
