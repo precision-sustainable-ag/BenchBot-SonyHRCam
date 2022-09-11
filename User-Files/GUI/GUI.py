@@ -546,7 +546,7 @@ class AcquisitionPage(QWidget):
                 WHEEL_MOTORS[1], d_correction_mm)
             self.mm.waitForMotionCompletion()
 
-    def capture_image(self, img_no):
+    def capture_image(self, img_no = 0):
         t = str(int(time.time()))
         os.startfile(CAM_PATH)
         save_oak_image(t)
@@ -623,13 +623,14 @@ class AcquisitionPage(QWidget):
     def check_miss(self, expected_count):
         filelist = [name for name in os.listdir('.') if os.path.isfile(name)]
         actual_count = len(filelist)
+        missed_spots = []
         if ((expected_count*3)>actual_count):
             # if expected_count is 4, image_taken list should have 0,1,2,3
             # check for missing number to know the stop
             for x in range(0,expected_count):
                 if x not in self.img_taken:
-                    return x
-        return -1
+                    missed_spots.append(x)
+        return missed_spots
 
     def move_files(self):
         for file in os.listdir('.'):
@@ -657,39 +658,50 @@ class AcquisitionPage(QWidget):
                 # self.mm.waitForMotionCompletion()
             else:
                 # total distance between home and end sensor
-                total_distance = int(HOME_TO_END_SENSOR_DISTANCE/(pots-1))
+                cam_stop_distance = int(HOME_TO_END_SENSOR_DISTANCE/(pots-1))
                 if not direction:
-                    total_distance *= -1
+                    cam_stop_distance *= -1
 
                 # capture images in a row (original round)
                 for i in range(1, pots):
                     if STOP_EXEC:
                         break
                     self.capture_image(i)
-                    self.mm.moveRelative(self.camera_motor, total_distance)
+                    self.mm.moveRelative(self.camera_motor, cam_stop_distance)
                     self.mm.waitForMotionCompletion()
                 if STOP_EXEC:
                     break         
                 self.capture_image(pots)
 
                 # check if any images were missed and if so, take action
-                missed_img = self.check_miss(pots)
+                missed_spots = self.check_miss(pots)
 
-                if missed_img != -1:
-                    total_distance *= -1
+                if missed_spots:
+                    missed_spots.sort(reverse=True)
+                    cam_stop_distance *= -1
                     direction = not direction
-                    new_distance = total_distance * (pots-1-missed_img)   # missed_img can be 0,1,2,3 in case of 4 images per row so it varies between (0,pots-1)
-                    # move camera plate to missed image spot
-                    self.mm.moveRelative(self.camera_motor, new_distance)
-                    self.mm.waitForMotionCompletion()
-                    self.capture_image()
-              
-                    # move camera plate to one of the ends, need to work more on this logic
-                    self.mm.moveRelative(self.camera_motor, total_distance*missed_img)
+                    previous_stop = 0
+
+                    for spot in missed_spots:
+                        stop_factor = pots-1-spot-previous_stop
+                        temp_distance = cam_stop_distance * stop_factor
+                        # move camera plate to missed image spot
+                        self.mm.moveRelative(self.camera_motor, temp_distance)
+                        self.mm.waitForMotionCompletion()
+                        self.capture_image()
+                        previous_stop += stop_factor
+
+                    # move camera plate to one of the ends
+                    if(spot<(pots/2)):
+                        end_distance = cam_stop_distance*spot
+                    else:
+                        direction = not direction
+                        end_distance = -cam_stop_distance*(pots-1-spot)
+                    self.mm.moveRelative(self.camera_motor, end_distance)
                     self.mm.waitForMotionCompletion()
 
                 # move image files to respective folders
-                self.move_files()
+                threading.Thread(self.move_files()).start()
 
                 # change direction of camera plate movement
                 direction = not direction
