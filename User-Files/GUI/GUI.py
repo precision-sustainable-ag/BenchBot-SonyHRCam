@@ -599,20 +599,6 @@ class AcquisitionPage(QWidget):
             self.time_label.setText(
                 '     Time Elapsed: '+str(elapsed_hr) + ' hrs '+str(elapsed_min) + ' mins')
 
-    def round(self, pots, distance):
-        for i in range(1, pots):
-            if STOP_EXEC:
-                break
-            # Trigger capture of image
-            self.capture_image()
-            # Move camera plate to next point
-            self.mm.moveRelative(self.camera_motor, distance)
-            self.mm.waitForMotionCompletion()
-        # Trigger image capture at last point 
-        if STOP_EXEC:
-            return          
-        self.capture_image()
-
     # recapturing missed images in the row
     def check_miss(self, expected_count):
         filelist = [name for name in os.listdir('.') if os.path.isfile(name)]
