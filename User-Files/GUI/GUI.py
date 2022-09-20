@@ -77,45 +77,42 @@ CAM_PATH = os.getcwd() / support_dir / "RemoteCli" / "RemoteCli.exe"
 
 # Helper function for getting distance measurements from sensor
 
-# def get_distances(s, offsets):
-    # # Number of queries of sensor measurements
-    # dist_list = np.zeros((NUMBER_OF_SENSORS, NUMBER_OF_SENSORS))
-    # dist_raw = np.zeros((NUMBER_OF_SENSORS, NUMBER_OF_SENSORS))
+def get_distances(s, offsets):
+    # Number of queries of sensor measurements
+    dist_list = np.zeros((NUMBER_OF_SENSORS, NUMBER_OF_SENSORS))
+    dist_raw = np.zeros((NUMBER_OF_SENSORS, NUMBER_OF_SENSORS))
 
-    # for k in range(0, NUMBER_OF_SENSORS):
-        # # Sending a request for data and receiving it
-        # s.sendall(bytes(ULTRASONIC_SENSOR_LISTS, encoding="utf-8"))
+    for k in range(0, NUMBER_OF_SENSORS):
+        # Sending a request for data and receiving it
+        s.sendall(bytes(ULTRASONIC_SENSOR_LISTS, encoding="utf-8"))
 
-        # # use timeout of 10 seconds to wait for sensor response
-        # ready = select.select([s], [], [], 10)
-        # if ready[0]:
-            # data = s.recv(4096)
-            # if "error" in str(data):
-                # return data
+        # use timeout of 10 seconds to wait for sensor response
+        ready = select.select([s], [], [], 10)
+        if ready[0]:
+            data = s.recv(4096)
+            if "error" in str(data):
+                return data
 
-        # else:
-            # print("Sensor error!")
-            # return "Sensor error!"
-        # time.sleep(0.25)
+        else:
+            print("Sensor error!")
+            return "Sensor error!"
+        time.sleep(0.25)
 
-        # # Parsing the measurements
-        # for i, item in enumerate(data.split()):
-            # dist_raw[k, i] = float(item)
-            # dist_list[k, i] = float(item) - offsets[i % 3]
+        # Parsing the measurements
+        for i, item in enumerate(data.split()):
+            dist_raw[k, i] = float(item)
+            dist_list[k, i] = float(item) - offsets[i % 3]
 
-    # dist_list = np.median(dist_list, 0)
-    # return dist_list
+    dist_list = np.median(dist_list, 0)
+    return dist_list
 
-def get_distances(offsets):
-    return [23, 23]
 
 # Helper function for computing orientation of robot
 
-
 def find_orientation(distance):
     '''
-    :param distance: np array. Average of N distances measured by the ultrasonic sensors. Array[0]=
-    front right sensor, Array[1]= back right sensor.
+    :param distance: np array. Average of N distances measured by the ultrasonic sensors.
+     Array[0]= front right sensor, Array[1]= back right sensor.
     :param ROBOT_LENGTH: distance in cm from front right to back right sensor
     :return: angle of drift from straight trajectory
     '''
@@ -129,19 +126,19 @@ def find_orientation(distance):
 
 ########################################## Establish connection with pi #############################################
 
-# # INITIALIZING SERVER IN RPI
-# ssh = paramiko.SSHClient()
-# ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-# ssh.connect(PI_HOST, username=PI_USERNAME, password=PI_PASSWORD)
-# ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(
-    # 'python /home/{}/ultrasonic_calibration/RPI_ServerSensors.py &'.format(PI_USERNAME))
-# time.sleep(2)
+# INITIALIZING SERVER IN RPI
+ssh = paramiko.SSHClient()
+ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+ssh.connect(PI_HOST, username=PI_USERNAME, password=PI_PASSWORD)
+ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(
+    'python /home/{}/ultrasonic_calibration/RPI_ServerSensors.py &'.format(PI_USERNAME))
+time.sleep(2)
 
-# # CONNECTING TO RPI SERVER
+# CONNECTING TO RPI SERVER
 
-# # Setting up the connection
-# s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-# s.connect((PI_HOST, PI_PORT))
+# Setting up the connection
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect((PI_HOST, PI_PORT))
 
 # LOADING OFFSETS
 csv_file = support_dir / "SensorOffsets.csv"
@@ -497,10 +494,10 @@ class AcquisitionPage(QWidget):
         self.mm.configAxisDirection(
             self.camera_motor, DIRECTION.POSITIVE)
 
-        # for axis in WHEEL_MOTORS:
-            # self.mm.configAxis(
-                # axis, MICRO_STEPS.ustep_8, MECH_GAIN.enclosed_timing_belt_mm_turn)
-            # self.mm.configAxisDirection(axis, DIRECTIONS[axis-2])
+        for axis in WHEEL_MOTORS:
+            self.mm.configAxis(
+                axis, MICRO_STEPS.ustep_8, MECH_GAIN.enclosed_timing_belt_mm_turn)
+            self.mm.configAxisDirection(axis, DIRECTIONS[axis-2])
 
         self.mm.emitAcceleration(50)
         self.mm.emitSpeed(80)
@@ -525,8 +522,7 @@ class AcquisitionPage(QWidget):
             os.mkdir("SONY")
 
     def correct_path(self):
-        # corrected_distance = get_distances(s, offsets)
-        corrected_distance = get_distances(offsets)
+        corrected_distance = get_distances(s, offsets)
         if "error" in corrected_distance:
             print(corrected_distance)
             return
@@ -563,8 +559,6 @@ class AcquisitionPage(QWidget):
                 elif file_name.endswith('.ARW'):
                     new_name = f"{STATE}_{timestamp}.ARW"
                 os.rename(file_name, new_name)
-            else:
-                continue
 
     def process_finished(self):
         global PROCESS_COMPLETE
@@ -619,14 +613,13 @@ class AcquisitionPage(QWidget):
             return          
         self.capture_image()
 
-    ##### logic for recapturing a single image in the row
+    # recapturing missed images in the row
     def check_miss(self, expected_count):
         filelist = [name for name in os.listdir('.') if os.path.isfile(name)]
         actual_count = len(filelist)
         missed_spots = []
         if ((expected_count*3)>actual_count):
-            # if expected_count is 4, image_taken list should have 0,1,2,3
-            # check for missing number to know the stop
+            # check for image numbers to know missed spots
             for x in range(0,expected_count):
                 if x not in self.img_taken:
                     missed_spots.append(x)
@@ -638,8 +631,6 @@ class AcquisitionPage(QWidget):
                 shutil.move(file, "OAK")
             elif file.startswith(STATE):
                 shutil.move(file, "SONY")
-            else:
-                continue
 
     # moves benchbot and captures images
     def acquisition_process(self):
@@ -654,8 +645,8 @@ class AcquisitionPage(QWidget):
             if pots == 0 or pots == 1:
                 if STOP_EXEC:
                     break
-                # self.mm.moveRelativeCombined(WHEEL_MOTORS, [DISTANCE_TRAVELED, DISTANCE_TRAVELED])
-                # self.mm.waitForMotionCompletion()
+                self.mm.moveRelativeCombined(WHEEL_MOTORS, [DISTANCE_TRAVELED, DISTANCE_TRAVELED])
+                self.mm.waitForMotionCompletion()
             else:
                 # total distance between home and end sensor
                 cam_stop_distance = int(HOME_TO_END_SENSOR_DISTANCE/(pots-1))
@@ -673,7 +664,7 @@ class AcquisitionPage(QWidget):
                     break         
                 self.capture_image(pots)
 
-                # check if any images were missed and if so, take action
+                # check if any images were missed and if so, recapture them
                 missed_spots = self.check_miss(pots)
 
                 if missed_spots:
@@ -705,8 +696,8 @@ class AcquisitionPage(QWidget):
 
                 # change direction of camera plate movement
                 direction = not direction
-                # self.mm.moveRelativeCombined(WHEEL_MOTORS, [DISTANCE_TRAVELED, DISTANCE_TRAVELED])
-                # self.mm.waitForMotionCompletion()
+                self.mm.moveRelativeCombined(WHEEL_MOTORS, [DISTANCE_TRAVELED, DISTANCE_TRAVELED])
+                self.mm.waitForMotionCompletion()
 
         if STOP_EXEC:
             self.stop()
