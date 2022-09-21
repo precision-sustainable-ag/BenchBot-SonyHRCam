@@ -1,7 +1,3 @@
-sys.path.append("..")
-sys.path.append("support")
-from MachineMotion import *
-
 import os
 import sys
 import time
@@ -19,6 +15,9 @@ from datetime import date
 from dotenv import load_dotenv
 from subprocess import call
 
+sys.path.append("..")
+sys.path.append("support")
+from MachineMotion import *
 
 ######## global vars fetched from .env file #########
 load_dotenv()
@@ -570,6 +569,8 @@ class AcquisitionPage(QWidget):
         rows = []
         for num in image_counts:
             rows.append(num[0])
+        rows = np.where(pd.isna(rows), 0, rows)
+        rows = rows.astype(int)
         return rows
 
     def create_directory(self):
