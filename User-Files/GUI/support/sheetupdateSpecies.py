@@ -39,14 +39,14 @@ for rows in row_list:
     for element in array_1:
         if '-' in element:
             array_2 = [int(e) for e in element.split('-')]
-            for val in range(array_2[0], array_2[1]+1):
+            for val in range(array_2[0], array_2[1] + 1):
                 species_row.append(val)
         else:
             species_row.append(int(element))
 
     for val in species_row:
         nam = str(species[s])[2:-2]
-        sheet.cell(row=val+1, column=1).value = nam
+        sheet.cell(row=val + 1, column=1).value = nam
     s += 1
 
 workbook.save(images_file)

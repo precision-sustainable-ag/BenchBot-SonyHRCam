@@ -30,7 +30,7 @@ i = 0
 for sp in species:
     idx = weed.index(sp[0])
     cnt = pics[idx]
-    sheet.cell(row=i+2, column=2).value = cnt
-    i = i+1
+    sheet.cell(row=i + 2, column=2).value = cnt
+    i = i + 1
 
 workbook.save(images_file)
