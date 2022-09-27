@@ -65,7 +65,8 @@ csv_file = support_dir / "SensorOffsets.csv"
 offsets = np.loadtxt(csv_file, delimiter=',', skiprows=1)
 # flag for testing mode
 testing = False
-
+# variable for multiples of images at each spot
+img_factor = 2
 ############################### Host Specific ###############################
 
 ######## execution in test mode #########
@@ -212,6 +213,8 @@ if OAK == 'yes':
     camRgb.preview.link(xoutRgb.input)
     device = dai.Device(pipeline)
     queue = device.getOutputQueue(name="rgb")
+
+    img_factor = 3
 
 else:
     def save_oak_image(t):
@@ -624,9 +627,9 @@ class AcquisitionPage(QWidget):
         for file_name in os.listdir('.'):
             if file_name.startswith(STATE + 'X'):
                 if file_name.endswith('.JPG'):
-                    self.img_taken.append(img_num - 1)
                     new_name = f"{STATE}_{timestamp}.JPG"
                 elif file_name.endswith('.ARW'):
+                    self.img_taken.append(img_num - 1)
                     new_name = f"{STATE}_{timestamp}.ARW"
                 os.rename(file_name, new_name)
 
@@ -674,7 +677,7 @@ class AcquisitionPage(QWidget):
         filelist = [name for name in os.listdir('.') if os.path.isfile(name)]
         actual_count = len(filelist)
         missed_spots = []
-        if ((expected_count * 3) > actual_count):
+        if ((expected_count * img_factor) > actual_count):
             # check for image numbers to know missed spots
             for x in range(0, expected_count):
                 if x not in self.img_taken:
