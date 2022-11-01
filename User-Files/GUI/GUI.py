@@ -192,27 +192,29 @@ if OAK == 'yes':
     def flushframes():
         for i in range(50):
             frame = queue.get()
-
-
+ 
+ 
     def save_oak_image(timestamp):
         flushframes()
         filename = f"{STATE}_OAK_{timestamp}.png"
         frame = queue.get()
-        imOut = frame.getCvFrame()
-        cv2.imwrite(filename, imOut)
-
-
+        cv2.imwrite(filename, frame.getCvFrame())
+ 
+ 
     pipeline = dai.Pipeline()
     camRgb = pipeline.create(dai.node.ColorCamera)
-    camRgb.setPreviewSize(3840, 2160)
     camRgb.setBoardSocket(dai.CameraBoardSocket.RGB)
+    camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_12_MP)
+    camRgb.setInterleaved(False)
+    camRgb.initialControl.setSharpness(0)      
+    camRgb.initialControl.setLumaDenoise(0)
+    camRgb.initialControl.setChromaDenoise(4)
     xoutRgb = pipeline.create(dai.node.XLinkOut)
-    camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_4_K)
-    camRgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.RGB)
     xoutRgb.setStreamName("rgb")
-    camRgb.preview.link(xoutRgb.input)
+    camRgb.isp.link(xoutRgb.input)
+
     device = dai.Device(pipeline)
-    queue = device.getOutputQueue(name="rgb")
+    queue = device.getOutputQueue(name="rgb", maxSize=1, blocking=False)
 
     img_factor = 3
 
