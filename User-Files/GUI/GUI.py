@@ -7,8 +7,6 @@ import threading
 import string
 import shutil
 import datetime
-import cv2
-import depthai as dai
 import numpy as np
 from pathlib import Path
 from datetime import date
@@ -81,7 +79,7 @@ if '--Test' in sys.argv:
 
     # path of the camera script
     if HOST == "RPi":
-        CAM_PATH = Path(os.getcwd(), "support/SONY_rpi/RemoteCli")
+        CAM_PATH =  os.getcwd() + "/support/SONY_rpi/RemoteCli"
     else:
         CAM_PATH = Path(os.getcwd(), "support/SONY_win/RemoteCli.exe")
 
@@ -91,20 +89,20 @@ if '--Test' in sys.argv:
 
 if HOST == "RPi" and not testing:
     print("Using RPi")
-
+    
     import json
     from RPI_Sensors import *
     from PyQt5 import QtWidgets
     from PyQt5.QtCore import QTimer
     from PyQt5.QtWidgets import *
-    from PyQt5.QtGui import QIntValidator
+    from PyQt5 import QtGui
 
-    CAM_PATH = Path(os.getcwd(), "support/SONY_rpi/RemoteCli")
+    CAM_PATH = os.getcwd() + "/support/SONY_rpi/RemoteCli"
 
     # Helper function for getting distance measurements from sensor
     def get_distances():
-        trigger_list = ULTRASONIC_SENSOR_LISTS.get("trigger_pins")
-        echo_list = ULTRASONIC_SENSOR_LISTS.get("echo_pins")
+        trigger_list = json.loads(ULTRASONIC_SENSOR_LISTS).get("trigger_pins")
+        echo_list = json.loads(ULTRASONIC_SENSOR_LISTS).get("echo_pins")
         dist_list = np.zeros((NUMBER_OF_SENSORS, NUMBER_OF_SENSORS))
         sensor = []
 
@@ -189,6 +187,8 @@ elif HOST == "Windows" and not testing:
 ################## OAK-D Functions ####################
 
 if OAK == 'yes':
+    import cv2
+    import depthai as dai
     def flushframes():
         for i in range(50):
             frame = queue.get()
@@ -447,7 +447,7 @@ class ImagesPage(QWidget):
         self.images_label = QLabel("Number of Images to Capture")
         self.next_button = QPushButton('NEXT', self)
         self.next_button.clicked.connect(self.check_content)
-        self.only_int = QIntValidator(0, 8, self)
+        self.only_int = QtGui.QIntValidator(0, 8, self)
 
         self.layout = QGridLayout()
         self.layout.addWidget(QLabel("            "), 0, 0)
@@ -592,6 +592,7 @@ class AcquisitionPage(QWidget):
 
     def correct_path(self):
         corrected_distance = get_distances()
+        print("Corrected distance/correct_path():",corrected_distance)
         if "error" in corrected_distance:
             print(corrected_distance)
             return
@@ -619,13 +620,13 @@ class AcquisitionPage(QWidget):
             time.sleep(8)
         else:
             os.system(CAM_PATH)
-            time.sleep(10)
+            time.sleep(1)
         threading.Thread(target=self.file_rename(t, img_no)).start()
 
     def file_rename(self, timestamp, img_num):
-        time.sleep(4)
+        time.sleep(1)
         for file_name in os.listdir('.'):
-            if file_name.startswith(STATE + 'X'):
+            if file_name.startswith('DSC'):
                 if file_name.endswith('.JPG'):
                     new_name = f"{STATE}_{timestamp}.JPG"
                 elif file_name.endswith('.ARW'):

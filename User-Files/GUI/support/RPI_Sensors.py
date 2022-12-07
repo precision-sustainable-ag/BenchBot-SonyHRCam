@@ -7,9 +7,12 @@ GPIO.setmode(GPIO.BCM)
 
 class UltrasonicSensor():
     def __init__(self,trig,echo):
-        GPIO.cleanup()
+        
+        # GPIO.cleanup()
+        # GPIO.setmode(GPIO.BCM)
         self.GPIO_TRIGGER = trig
         self.GPIO_ECHO = echo
+        print(self.GPIO_TRIGGER)
         GPIO.setup(self.GPIO_TRIGGER, GPIO.OUT)
         GPIO.setup(self.GPIO_ECHO, GPIO.IN)
         

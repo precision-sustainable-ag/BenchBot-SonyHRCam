@@ -100,7 +100,8 @@ def get_distances_rpi(cfg, offsets):
             dist_list[k, i] = dist_raw - offsets[i]
 
     dist_list = np.median(dist_list, 0)
-    return dist_list
+    print(dist_list)
+    return [dist_list[1],dist_list[0]]
 
 
 # Helper function for computing orientation of robot

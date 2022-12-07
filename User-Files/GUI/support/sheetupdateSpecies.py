@@ -33,13 +33,14 @@ sheet["B1"] = "ImagesCount"
 
 # add new data to the sheet
 s = 0
+print('row list',row_list)
 for rows in row_list:
     species_row = []
     if type(rows) ==  'numpy.int64':
         species_row.append(int(rows))
         
     else:
-        array_1 = rows.split(',')
+        array_1 = rows.split(',') if "," in rows else rows
         for element in array_1:
             if '-' in element:
                 array_2 = [int(e) for e in element.split('-')]

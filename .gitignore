@@ -2,7 +2,12 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+# Data
+**TX_**
+**.JPG
+**.ARW
+**.csv
+**.xlsx
 # pyenv
 .python-version
 

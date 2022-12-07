@@ -10,7 +10,7 @@ from MachineMotion import *
 
 class GoHome:
 
-    def __init__(self, offset_path, move_distance):
+    def __init__(self, offset_path, direction, move_distance):
         """Main BBot operation class that use configuration information to 
         move the benchbot back to start position after acquisition has 
         completed for a single bed.
@@ -23,8 +23,9 @@ class GoHome:
         self.cfg = get_config()
         self.offsets = read_offsets(offset_path)
         self.move_distance = move_distance
+        self.direction = direction
         self.mm_acceleration = 50
-        self.mm_speed = 80
+        self.mm_speed = 200
         self.total_distance = [10000, 10000]  #Total track for each wheel
         self.traversed_distance = 0
         # Init bbot
@@ -42,8 +43,13 @@ class GoHome:
         # config machine motion
         for axis in self.cfg.WHEEL_MOTORS:
             self.mm.configAxis(axis, MICRO_STEPS.ustep_8,
-                               MECH_GAIN.enclosed_timing_belt_self.mm_turn)
-            self.mm.configAxisDirection(axis, self.cfg.DIRECTIONS[axis - 2])
+                               MECH_GAIN.enclosed_timing_belt_mm_turn)
+            if self.direction == "reverse":
+                go_home_directions = ["positive", "negative"]
+            else:
+                go_home_directions = ["negative", "positive"]
+
+            self.mm.configAxisDirection(axis,go_home_directions[axis - 2])
         self.mm.emitAcceleration(self.mm_acceleration)
         self.mm.emitSpeed(self.mm_speed)
 
@@ -129,8 +135,9 @@ class GoHome:
             self.move_wheels()
             self.check_relative_wheel_pos()
             act_poss = self.check_actual_position()
-
+            print(act_poss)
             # Stop after user defined travel distance
+            print(self.move_distance)
             if act_poss[0] + 50 > self.move_distance or act_poss[
                     1] + 50 > self.move_distance:
                 print(
@@ -153,12 +160,15 @@ def main():
     parser.add_argument('--offsets',
                         help="Path to 'SensorOffsets.csv' file",
                         default="SensorOffsets.csv")
-
+    parser.add_argument('--direction',
+                        help="direction",
+                        default="reverse")
     args = vars(parser.parse_args())
     offsets_path = args['offsets']
     travel_dist = args['move']
+    direction = args["direction"]
     print("\nInitializing GoHome...")
-    gh = GoHome(offsets_path, travel_dist)
+    gh = GoHome(offsets_path, direction,travel_dist)
     gh.start()
 
 

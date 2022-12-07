@@ -7,8 +7,8 @@ import time
 GPIO.setmode(GPIO.BCM)
 
 # set GPIO Pins
-GPIO_TRIGGER = 5
-GPIO_ECHO = 19
+GPIO_TRIGGER = 18
+GPIO_ECHO = 23
 
 # GPIO_TRIGGER 25 and GPIO_ECHO 8 correspond to the front left sensor
 # GPIO_TRIGGER 2 and GPIO_ECHO 3 correspond to back left sensor
@@ -61,8 +61,8 @@ def distance():
 if __name__ == '__main__':
     try:
         while True:
-            distance = distance()
-            print("Measured Distance = %.1f cm" % distance)
+            measured_distance = distance()
+            print("Measured Distance = %.1f cm" % measured_distance)
             time.sleep(1)
 
         # Reset by pressing CTRL + C
