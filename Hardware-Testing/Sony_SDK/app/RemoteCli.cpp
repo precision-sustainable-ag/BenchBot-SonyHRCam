@@ -31,6 +31,7 @@ int main()
     auto* camera_info = camera_list->GetCameraObjectInfo(0);
     CameraDevicePtr camera = CameraDevicePtr(new cli::CameraDevice(1, nullptr, camera_info));
 	camera->connect(SDK::CrSdkControlMode_Remote);
+    std::this_thread::sleep_for(0.4s);
 	camera->af_shutter();
 	std::this_thread::sleep_for(5s);
 	
