@@ -618,7 +618,7 @@ class AcquisitionPage(QWidget):
         save_oak_image(t)
         if HOST == "Windows":
             os.startfile(CAM_PATH)
-            time.sleep(8)
+            time.sleep(10)
         else:
             os.system(CAM_PATH)
             time.sleep(10)
@@ -627,7 +627,7 @@ class AcquisitionPage(QWidget):
     def file_rename(self, timestamp, img_num):
         time.sleep(4)
         for file_name in os.listdir('.'):
-            if file_name.startswith(STATE + 'X'):
+            if file_name.startswith(STATE + 'Y'):
                 if file_name.endswith('.JPG'):
                     new_name = f"{STATE}_{timestamp}.JPG"
                 elif file_name.endswith('.ARW'):
