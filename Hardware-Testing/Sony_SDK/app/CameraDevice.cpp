@@ -183,17 +183,17 @@ void CameraDevice::af_shutter() const
     SDK::SetDeviceProperty(m_device_handle, &prop);
 
     // Wait, then send shutter down
-    std::this_thread::sleep_for(500ms);
+    std::this_thread::sleep_for(800ms);
     //tout << "Shutter down\n";
     SDK::SendCommand(m_device_handle, SDK::CrCommandId::CrCommandId_Release, SDK::CrCommandParam::CrCommandParam_Down);
 
     // Wait, then send shutter up
-    std::this_thread::sleep_for(35ms);
+    std::this_thread::sleep_for(90ms);
     //tout << "Shutter up\n";
     SDK::SendCommand(m_device_handle, SDK::CrCommandId::CrCommandId_Release, SDK::CrCommandParam::CrCommandParam_Up);
 
     // Wait, then send shutter up
-    std::this_thread::sleep_for(1s);
+    std::this_thread::sleep_for(1.5s);
     //tout << "Shutter Halfpress up\n";
     prop.SetCurrentValue(SDK::CrLockIndicator::CrLockIndicator_Unlocked);
     SDK::SetDeviceProperty(m_device_handle, &prop);
