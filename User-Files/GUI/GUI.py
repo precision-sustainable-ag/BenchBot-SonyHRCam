@@ -185,6 +185,10 @@ elif HOST == "Windows" and not testing:
 
         dist_list = np.median(dist_list, 0)
         return dist_list
+    
+elif HOST == "Linux" and not testing:
+    print("Using Linux")
+    CAM_PATH = Path(os.getcwd(), "support/SONY_linux/RemoteCli")
 
 ################## OAK-D Functions ####################
 
@@ -621,7 +625,7 @@ class AcquisitionPage(QWidget):
             time.sleep(8)
         else:
             os.system(CAM_PATH)
-            time.sleep(10)
+            time.sleep(8)
         threading.Thread(target=self.file_rename(t, img_no)).start()
 
     def file_rename(self, timestamp, img_num):
