@@ -1,3 +1,8 @@
+# Setup type: 'RPi' / 'Windows'
+HOST_TYPE = 'Windows'
+# If also using OAK-D camera along with SONY 'yes' / 'no'
+OAK = 'no'
+
 # Length of the robot: distance between front and back ultrasonic sensors measured in cm.
 ROBOT_LENGTH = 133
 # Width of the robot: distance between the two motorized wheels in cm.

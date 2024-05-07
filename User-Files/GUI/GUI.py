@@ -1,10 +1,3 @@
-sys.path.append("..")
-sys.path.append("support")
-from PyQt6.QtGui import QIntValidator
-from PyQt6.QtWidgets import *
-from PyQt6.QtCore import QTimer
-from PyQt6 import QtWidgets
-from MachineMotion import *
 import os
 import sys
 import time
@@ -14,9 +7,6 @@ import threading
 import string
 import shutil
 import datetime
-import paramiko
-import socket
-import select
 import cv2
 import depthai as dai
 import numpy as np
@@ -25,17 +15,20 @@ from datetime import date
 from dotenv import load_dotenv
 from subprocess import call
 
+sys.path.append("..")
+sys.path.append("support")
+from MachineMotion import *
 
 ######## global vars fetched from .env file #########
 load_dotenv()
+# host type either RPi/Windows
+HOST = os.environ['HOST_TYPE']
+# If also using OAK-D camera along with SONY
+OAK = os.environ['OAK']
 # Length of the robot (between front and back sensors) measured in cm
 ROBOT_LENGTH = int(os.environ['ROBOT_LENGTH'])
 # width of the robot (distance between two front wheels) in cm
 ROBOT_WIDTH = int(os.environ['ROBOT_WIDTH'])
-# if you haven't changed your pi's name the default username is 'pi'
-PI_USERNAME = os.environ['PI_USERNAME']
-# if you haven't changed your pi's password, the default is 'raspberrypi'
-PI_PASSWORD = os.environ['PI_PASSWORD']
 # Distance between rows in mm
 DISTANCE_TRAVELED = int(os.environ['DISTANCE_TRAVELED'])
 # if BB moving backwards change the motors order to [3,2]
@@ -54,11 +47,8 @@ DIRECTIONS = os.environ['DIRECTIONS'].split(',')
 # total distance between proximity sensors around camera plate
 HOME_TO_END_SENSOR_DISTANCE = int(os.environ['HOME_TO_END_SENSOR_DISTANCE'])
 
+
 ######## Do not change these #########
-# The server's hostname or IP address
-PI_HOST = "192.168.7.3"
-# The port used by the server
-PI_PORT = 65432
 # global flag used to stop execution
 STOP_EXEC = False
 # global flag used to mark completion
@@ -70,46 +60,172 @@ support_dir = Path("support")
 SPECIES_SHEET = support_dir / "SpeciesSheet.xlsx"
 # name of images sheet file
 IMAGES_SHEET = support_dir / "ImagesSheet.xlsx"
-# path of the camera script
-CAM_PATH = os.getcwd() / support_dir / "RemoteCli" / "RemoteCli.exe"
+# LOADING OFFSETS
+csv_file = support_dir / "SensorOffsets.csv"
+offsets = np.loadtxt(csv_file, delimiter=',', skiprows=1)
+# flag for testing mode
+testing = False
+# variable for multiples of images at each spot
+img_factor = 2
+############################### Host Specific ###############################
 
-######## Ultrasonic sensors and laptop-pi communication functions ########
+######## execution in test mode #########
+if '--Test' in sys.argv:
+    testing = True
+    print("Test Mode")
 
-# Helper function for getting distance measurements from sensor
+    from PyQt6 import QtWidgets
+    from PyQt6.QtCore import QTimer
+    from PyQt6.QtWidgets import *
+    from PyQt6.QtGui import QIntValidator
+
+    # path of the camera script
+    if HOST == "RPi":
+        CAM_PATH = Path(os.getcwd(), "support/SONY_rpi/RemoteCli")
+    else:
+        CAM_PATH = Path(os.getcwd(), "support/SONY_win/RemoteCli.exe")
+
+    def get_distances():
+        return [14] * NUMBER_OF_SENSORS
 
 
-def get_distances(s, offsets):
-    # Number of queries of sensor measurements
-    dist_list = np.zeros((NUMBER_OF_SENSORS, NUMBER_OF_SENSORS))
-    dist_raw = np.zeros((NUMBER_OF_SENSORS, NUMBER_OF_SENSORS))
+if HOST == "RPi" and not testing:
+    print("Using RPi")
 
-    for k in range(0, NUMBER_OF_SENSORS):
-        # Sending a request for data and receiving it
-        s.sendall(bytes(ULTRASONIC_SENSOR_LISTS, encoding="utf-8"))
+    import json
+    from RPI_Sensors import *
+    from PyQt5 import QtWidgets
+    from PyQt5.QtCore import QTimer
+    from PyQt5.QtWidgets import *
+    from PyQt5.QtGui import QIntValidator
 
-        # use timeout of 10 seconds to wait for sensor response
-        ready = select.select([s], [], [], 10)
-        if ready[0]:
-            data = s.recv(4096)
-            if "error" in str(data):
-                return data
+    CAM_PATH = Path(os.getcwd(), "support/SONY_rpi/RemoteCli")
 
-        else:
-            print("Sensor error!")
-            return "Sensor error!"
-        time.sleep(0.25)
+    # Helper function for getting distance measurements from sensor
+    def get_distances():
+        trigger_list = ULTRASONIC_SENSOR_LISTS.get("trigger_pins")
+        echo_list = ULTRASONIC_SENSOR_LISTS.get("echo_pins")
+        dist_list = np.zeros((NUMBER_OF_SENSORS, NUMBER_OF_SENSORS))
+        sensor = []
 
-        # Parsing the measurements
-        for i, item in enumerate(data.split()):
-            dist_raw[k, i] = float(item)
-            dist_list[k, i] = float(item) - offsets[i % 3]
+        for num in range(0, NUMBER_OF_SENSORS):
+            sensor.append(UltrasonicSensor(trigger_list[num], echo_list[num]))
 
-    dist_list = np.median(dist_list, 0)
-    return dist_list
+        for k in range(0, NUMBER_OF_SENSORS):
+            for i in range(0, NUMBER_OF_SENSORS):
+                dist_raw = round(sensor[i].distance(), 1)
+                dist_list[k, i] = dist_raw - offsets[i]
+
+        dist_list = np.median(dist_list, 0)
+        return dist_list
+
+
+elif HOST == "Windows" and not testing:
+    print("Using Windows")
+
+    import paramiko
+    import socket
+    import select
+    from PyQt6 import QtWidgets
+    from PyQt6.QtCore import QTimer
+    from PyQt6.QtWidgets import *
+    from PyQt6.QtGui import QIntValidator
+
+    # if you haven't changed your pi's name the default username is 'pi'
+    PI_USERNAME = os.environ['PI_USERNAME']
+    # if you haven't changed your pi's password, the default is 'raspberrypi'
+    PI_PASSWORD = os.environ['PI_PASSWORD']
+    # The server's hostname or IP address
+    PI_HOST = "192.168.7.3"
+    # The port used by the server
+    PI_PORT = 65432
+
+    # path of the camera script
+    CAM_PATH = Path(os.getcwd(), "support/SONY_win/RemoteCli.exe")
+
+    ####################### Establish connection with pi #####################
+
+    # INITIALIZING SERVER IN RPI
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.connect(PI_HOST, username=PI_USERNAME, password=PI_PASSWORD)
+    ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(
+        'python /home/{}/ultrasonic_calibration/RPI_ServerSensors.py &'.format(PI_USERNAME))
+    time.sleep(2)
+
+    # CONNECTING TO RPI SERVER
+    # Setting up the connection
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((PI_HOST, PI_PORT))
+
+    # Helper function for getting distance measurements from sensor
+    def get_distances():
+        # Number of queries of sensor measurements
+        dist_list = np.zeros((NUMBER_OF_SENSORS, NUMBER_OF_SENSORS))
+        dist_raw = np.zeros((NUMBER_OF_SENSORS, NUMBER_OF_SENSORS))
+
+        for k in range(0, NUMBER_OF_SENSORS):
+            # Sending a request for data and receiving it
+            s.sendall(bytes(ULTRASONIC_SENSOR_LISTS, encoding="utf-8"))
+
+            # use timeout of 10 seconds to wait for sensor response
+            ready = select.select([s], [], [], 10)
+            if ready[0]:
+                data = s.recv(4096)
+                if "error" in str(data):
+                    return data
+            else:
+                return "Sensor error!"
+            time.sleep(0.25)
+
+            # Parsing the measurements
+            for i, item in enumerate(data.split()):
+                dist_raw[k, i] = float(item)
+                dist_list[k, i] = float(item) - offsets[i % 3]
+
+        dist_list = np.median(dist_list, 0)
+        return dist_list
+
+################## OAK-D Functions ####################
+
+if OAK == 'yes':
+    def flushframes():
+        for i in range(50):
+            frame = queue.get()
+ 
+ 
+    def save_oak_image(timestamp):
+        flushframes()
+        filename = f"{STATE}_OAK_{timestamp}.png"
+        frame = queue.get()
+        cv2.imwrite(filename, frame.getCvFrame())
+ 
+ 
+    pipeline = dai.Pipeline()
+    camRgb = pipeline.create(dai.node.ColorCamera)
+    camRgb.setBoardSocket(dai.CameraBoardSocket.RGB)
+    camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_12_MP)
+    camRgb.setInterleaved(False)
+    camRgb.initialControl.setSharpness(0)      
+    camRgb.initialControl.setLumaDenoise(0)
+    camRgb.initialControl.setChromaDenoise(4)
+    xoutRgb = pipeline.create(dai.node.XLinkOut)
+    xoutRgb.setStreamName("rgb")
+    camRgb.isp.link(xoutRgb.input)
+
+    device = dai.Device(pipeline)
+    queue = device.getOutputQueue(name="rgb", maxSize=1, blocking=False)
+
+    img_factor = 3
+
+else:
+    def save_oak_image(t):
+        pass
+
+############################ End Host specific ##############################
 
 
 # Helper function for computing orientation of robot
-
 def find_orientation(distance):
     '''
     :param distance: np array. Average of N distances measured by the ultrasonic sensors.
@@ -117,63 +233,10 @@ def find_orientation(distance):
     :param ROBOT_LENGTH: distance in cm from front right to back right sensor
     :return: angle of drift from straight trajectory
     '''
-    print('distance[0]=', distance[0])
-    print('distance[1]=', distance[1])
+    # print('distance[0]=', distance[0])
+    # print('distance[1]=', distance[1])
     theta = np.arctan2((distance[0] - distance[1]), ROBOT_LENGTH) * 180 / np.pi
     return theta
-
-
-###### End Ultrasonic sensors and laptop-pi communication functions ######
-
-################ Establish connection with pi ##################
-
-# INITIALIZING SERVER IN RPI
-ssh = paramiko.SSHClient()
-ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect(PI_HOST, username=PI_USERNAME, password=PI_PASSWORD)
-ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(
-    'python /home/{}/ultrasonic_calibration/RPI_ServerSensors.py &'.format(PI_USERNAME))
-time.sleep(2)
-
-# CONNECTING TO RPI SERVER
-
-# Setting up the connection
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect((PI_HOST, PI_PORT))
-
-# LOADING OFFSETS
-csv_file = support_dir / "SensorOffsets.csv"
-offsets = np.loadtxt(csv_file, delimiter=',', skiprows=1)
-
-########################### OAK-D Funcs ###########################
-
-
-def flushframes():
-    for i in range(50):
-        frame = queue.get()
-
-
-def save_oak_image(timestamp):
-    flushframes()
-    filename = f"{STATE}_OAK_{timestamp}.png"
-    frame = queue.get()
-    imOut = frame.getCvFrame()
-    cv2.imwrite(filename, imOut)
-
-
-pipeline = dai.Pipeline()
-camRgb = pipeline.create(dai.node.ColorCamera)
-camRgb.setPreviewSize(3840, 2160)
-camRgb.setBoardSocket(dai.CameraBoardSocket.RGB)
-xoutRgb = pipeline.create(dai.node.XLinkOut)
-camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_4_K)
-camRgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.RGB)
-xoutRgb.setStreamName("rgb")
-camRgb.preview.link(xoutRgb.input)
-device = dai.Device(pipeline)
-queue = device.getOutputQueue(name="rgb")
-
-###################################################################
 
 
 # main window class for selecting metadata
@@ -235,6 +298,7 @@ class MainWindow(QWidget):
         page = ImagesPage()
         main_window.addWidget(page)
         main_window.setCurrentIndex(main_window.currentIndex() + 1)
+
 
 # window class used to edit the species
 
@@ -513,6 +577,8 @@ class AcquisitionPage(QWidget):
         rows = []
         for num in image_counts:
             rows.append(num[0])
+        rows = np.where(pd.isna(rows), 0, rows)
+        rows = rows.astype(int)
         return rows
 
     def create_directory(self):
@@ -527,7 +593,7 @@ class AcquisitionPage(QWidget):
             os.mkdir("SONY")
 
     def correct_path(self):
-        corrected_distance = get_distances(s, offsets)
+        corrected_distance = get_distances()
         if "error" in corrected_distance:
             print(corrected_distance)
             return
@@ -549,9 +615,13 @@ class AcquisitionPage(QWidget):
 
     def capture_image(self, img_no=0):
         t = str(int(time.time()))
-        os.startfile(CAM_PATH)
         save_oak_image(t)
-        time.sleep(8)
+        if HOST == "Windows":
+            os.startfile(CAM_PATH)
+            time.sleep(8)
+        else:
+            os.system(CAM_PATH)
+            time.sleep(10)
         threading.Thread(target=self.file_rename(t, img_no)).start()
 
     def file_rename(self, timestamp, img_num):
@@ -559,9 +629,9 @@ class AcquisitionPage(QWidget):
         for file_name in os.listdir('.'):
             if file_name.startswith(STATE + 'X'):
                 if file_name.endswith('.JPG'):
-                    self.img_taken.append(img_num - 1)
                     new_name = f"{STATE}_{timestamp}.JPG"
                 elif file_name.endswith('.ARW'):
+                    self.img_taken.append(img_num - 1)
                     new_name = f"{STATE}_{timestamp}.ARW"
                 os.rename(file_name, new_name)
 
@@ -609,7 +679,7 @@ class AcquisitionPage(QWidget):
         filelist = [name for name in os.listdir('.') if os.path.isfile(name)]
         actual_count = len(filelist)
         missed_spots = []
-        if ((expected_count * 3) > actual_count):
+        if ((expected_count * img_factor) > actual_count):
             # check for image numbers to know missed spots
             for x in range(0, expected_count):
                 if x not in self.img_taken:
