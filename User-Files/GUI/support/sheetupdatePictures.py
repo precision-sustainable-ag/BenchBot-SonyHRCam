@@ -28,9 +28,10 @@ workbook = openpyxl.load_workbook(images_file)
 sheet = workbook.active
 i = 0
 for sp in species:
-    idx = weed.index(sp[0])
-    cnt = pics[idx]
-    sheet.cell(row=i+2, column=2).value = cnt
-    i = i+1
+    if not pd.isna(sp):
+        idx = weed.index(sp[0])
+        cnt = pics[idx]
+        sheet.cell(row=i + 2, column=2).value = cnt
+    i = i + 1
 
 workbook.save(images_file)
