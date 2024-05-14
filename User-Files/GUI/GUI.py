@@ -188,7 +188,17 @@ elif HOST == "Windows" and not testing:
     
 elif HOST == "Linux" and not testing:
     print("Using Linux")
+    import paramiko
+    import socket
+    import select
+    from PyQt6 import QtWidgets
+    from PyQt6.QtCore import QTimer
+    from PyQt6.QtWidgets import *
+    from PyQt6.QtGui import QIntValidator
+
     CAM_PATH = Path(os.getcwd(), "support/SONY_linux/RemoteCli")
+    def get_distances():
+        pass
 
 ################## OAK-D Functions ####################
 
@@ -413,7 +423,7 @@ class SpeciesPage(QWidget):
             sheet.cell(row=current_count + 2, column=2).value = ''
             sheet.cell(row=current_count + 2, column=3).value = ''
         workbook.save(SPECIES_SHEET)
-        call(["python", support_dir / "sheetupdateSpecies.py"])
+        call(["python3", support_dir / "sheetupdateSpecies.py"])
         # time.sleep(0.1)
         threading.Thread(target=backup_sheet).start()
 
@@ -514,7 +524,7 @@ class ImagesPage(QWidget):
                 sheet.cell(
                     row=snap + 2, column=3).value = self.snaps[snap].text()
             workbook.save(SPECIES_SHEET)
-            call(["python", support_dir / "sheetupdatePictures.py"])
+            call(["python3", support_dir / "sheetupdatePictures.py"])
             confirm_dialog.done(1)
             page = AcquisitionPage()
             main_window.addWidget(page)
