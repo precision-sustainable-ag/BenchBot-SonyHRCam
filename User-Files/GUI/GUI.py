@@ -185,6 +185,20 @@ elif HOST == "Windows" and not testing:
 
         dist_list = np.median(dist_list, 0)
         return dist_list
+    
+elif HOST == "Linux" and not testing:
+    print("Using Linux")
+    import paramiko
+    import socket
+    import select
+    from PyQt6 import QtWidgets
+    from PyQt6.QtCore import QTimer
+    from PyQt6.QtWidgets import *
+    from PyQt6.QtGui import QIntValidator
+
+    CAM_PATH = Path(os.getcwd(), "support/SONY_linux/RemoteCli")
+    def get_distances():
+        pass
 
 ################## OAK-D Functions ####################
 
@@ -409,7 +423,7 @@ class SpeciesPage(QWidget):
             sheet.cell(row=current_count + 2, column=2).value = ''
             sheet.cell(row=current_count + 2, column=3).value = ''
         workbook.save(SPECIES_SHEET)
-        call(["python", support_dir / "sheetupdateSpecies.py"])
+        call(["python3", support_dir / "sheetupdateSpecies.py"])
         # time.sleep(0.1)
         threading.Thread(target=backup_sheet).start()
 
@@ -510,7 +524,7 @@ class ImagesPage(QWidget):
                 sheet.cell(
                     row=snap + 2, column=3).value = self.snaps[snap].text()
             workbook.save(SPECIES_SHEET)
-            call(["python", support_dir / "sheetupdatePictures.py"])
+            call(["python3", support_dir / "sheetupdatePictures.py"])
             confirm_dialog.done(1)
             page = AcquisitionPage()
             main_window.addWidget(page)
@@ -621,7 +635,7 @@ class AcquisitionPage(QWidget):
             time.sleep(8)
         else:
             os.system(CAM_PATH)
-            time.sleep(10)
+            time.sleep(8)
         threading.Thread(target=self.file_rename(t, img_no)).start()
 
     def file_rename(self, timestamp, img_num):
@@ -702,7 +716,7 @@ class AcquisitionPage(QWidget):
 
         for pots in total_rows:
             self.img_taken = []
-            self.correct_path()
+            # self.correct_path()
             if pots == 0 or pots == 1:
                 if STOP_EXEC:
                     break

@@ -1,4 +1,4 @@
-# Setup type: 'RPi' / 'Windows'
+# Setup type: 'RPi' / 'Windows' / 'Linux'
 HOST_TYPE = 'Windows'
 # If also using OAK-D camera along with SONY 'yes' / 'no'
 OAK = 'no'
