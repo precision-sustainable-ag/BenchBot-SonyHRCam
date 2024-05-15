@@ -716,7 +716,7 @@ class AcquisitionPage(QWidget):
 
         for pots in total_rows:
             self.img_taken = []
-            self.correct_path()
+            # self.correct_path()
             if pots == 0 or pots == 1:
                 if STOP_EXEC:
                     break
